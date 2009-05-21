@@ -153,6 +153,9 @@ int main()
 	write_u32(128 + 4 + 4*6*3 + 4, 1100); // offset
 	qcms_profile_release(qcms_profile_from_memory(buf, 1500));
 
+	/* test out profiles that are the wrong size */
+	qcms_profile_from_path("sample-trunc.icc");
+
 	return 0;
 }
 
