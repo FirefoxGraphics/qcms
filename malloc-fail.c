@@ -91,6 +91,9 @@ void do_test(void) {
 		qcms_profile_release(input_profile);
 	if (rgb)
 		qcms_profile_release(rgb);
+	rgb = qcms_profile_from_path("sample-trunc.icc");
+	if (rgb)
+		qcms_profile_release(rgb);
 }
 
 static int current_counter;
