@@ -68,7 +68,6 @@ int main(int argc, char **argv)
 	qcms_profile_precache_output_transform(output_profile);
 
 	transform = qcms_transform_create(input_profile, QCMS_DATA_RGB_8, output_profile, QCMS_DATA_RGB_8, QCMS_INTENT_PERCEPTUAL);
-	//transform = qcms_create_transform(output_profile, input_profile);
 	qcms_transform_data(transform, src, qoutput, LENGTH);
 	clock_t qcms_time = clock() - qcms_start;
 	printf("lcms: %ld\n", lcms_time);
