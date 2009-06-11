@@ -1364,10 +1364,17 @@ qcms_bool compute_precache(struct curveType *trc, uint8_t *output)
 	} else if (trc->count == 1) {
 		compute_precache_pow(output, 1./u8Fixed8Number_to_float(trc->data[0]));
 	} else {
-		uint16_t *inverted = invert_lut(trc->data, trc->count, trc->count);
+		uint16_t *inverted;
+		int inverted_size = trc->count;
+		//XXX: the choice of a minimum of 256 here is not backed by any theory, measurement or data, however it is what lcms uses.
+		// the maximum number we would need is 65535 because that's the accuracy used for computing the precache table
+		if (inverted_size < 256)
+			inverted_size = 256;
+
+		inverted = invert_lut(trc->data, trc->count, inverted_size);
 		if (!inverted)
 			return false;
-		compute_precache_lut(output, inverted, trc->count);
+		compute_precache_lut(output, inverted, inverted_size);
 		free(inverted);
 	}
 	return true;
@@ -1442,7 +1449,6 @@ static qcms_bool sse2_available(void)
        return false;
 }
 
-
 void build_output_lut(struct curveType *trc,
 		uint16_t **output_gamma_lut, size_t *output_gamma_lut_length)
 {
@@ -1454,8 +1460,12 @@ void build_output_lut(struct curveType *trc,
 		*output_gamma_lut = build_pow_table(gamma, 4096);
 		*output_gamma_lut_length = 4096;
 	} else {
-		*output_gamma_lut = invert_lut(trc->data, trc->count, trc->count);
+		//XXX: the choice of a minimum of 256 here is not backed by any theory, measurement or data, however it is what lcms uses.
 		*output_gamma_lut_length = trc->count;
+		if (*output_gamma_lut_length < 256)
+			*output_gamma_lut_length = 256;
+
+		*output_gamma_lut = invert_lut(trc->data, trc->count, *output_gamma_lut_length);
 	}
 
 }
