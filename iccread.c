@@ -675,15 +675,15 @@ qcms_profile* qcms_profile_from_memory(const void *mem, size_t size)
 		if (profile->color_space == RGB_SIGNATURE) {
 
 			profile->redColorant = read_tag_XYZType(src, index, TAG_rXYZ);
-			profile->blueColorant = read_tag_XYZType(src, index, TAG_bXYZ);
 			profile->greenColorant = read_tag_XYZType(src, index, TAG_gXYZ);
+			profile->blueColorant = read_tag_XYZType(src, index, TAG_bXYZ);
 
 			if (!src->valid)
 				goto invalid_tag_table;
 
 			profile->redTRC = read_tag_curveType(src, index, TAG_rTRC);
-			profile->blueTRC = read_tag_curveType(src, index, TAG_bTRC);
 			profile->greenTRC = read_tag_curveType(src, index, TAG_gTRC);
+			profile->blueTRC = read_tag_curveType(src, index, TAG_bTRC);
 
 			if (!profile->redTRC || !profile->blueTRC || !profile->greenTRC)
 				goto invalid_tag_table;
