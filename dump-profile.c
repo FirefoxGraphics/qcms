@@ -6,7 +6,7 @@ void dump_profile(qcms_profile *profile)
 	if (profile) {
 		printf(" rendering intent: %d\n", qcms_profile_get_rendering_intent(profile));
 		if (qcms_profile_is_bogus(profile)) {
-			printf(" bougs\n");
+			printf(" bogus\n");
 		}
 		qcms_profile_release(profile);
 	} else {
