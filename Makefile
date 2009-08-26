@@ -4,7 +4,7 @@
 OPT_FLAGS=-O0
 OPT_FLAGS=
 CFLAGS=-Wall $(OPT_FLAGS) $(COVERAGE_FLAGS) -Wdeclaration-after-statement -ggdb `pkg-config --cflags lcms`
-LDFLAGS=`pkg-config --libs lcms`
+LDFLAGS=`pkg-config --libs lcms` -ldl
 
 QCMS_SRC=iccread.c transform.c
 QCMS_OBJS=iccread.o transform.o
