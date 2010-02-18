@@ -5,12 +5,17 @@
 #define BITMAP_INFO (kCGBitmapByteOrder32Big | kCGImageAlphaNoneSkipLast)
 
 
-int main() {
+int main(int argc, char **argv) {
 	int width = 256;
 	int height = 256*256;
-
-	CGDataProviderRef input_file = CGDataProviderCreateWithFilename("input.icc");
-	CGDataProviderRef output_file = CGDataProviderCreateWithFilename("output.icc");
+	char *input_profile_file = "input.icc";
+	char *output_profile_file = "output.icc";
+	if (argc >= 3) {
+		input_profile_file = argv[1];
+		output_profile_file = argv[2];
+	}
+	CGDataProviderRef input_file = CGDataProviderCreateWithFilename(input_profile_file);
+	CGDataProviderRef output_file = CGDataProviderCreateWithFilename(output_profile_file);
 	float range[] = {0, 1., 0, 1., 0, 1.};
 	CGColorSpaceRef output_profile = CGColorSpaceCreateICCBased(3, range, output_file, NULL);
 	CGColorSpaceRef input_profile = CGColorSpaceCreateICCBased(3, range, input_file, NULL);
