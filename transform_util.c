@@ -382,29 +382,28 @@ static uint16_t *invert_lut(uint16_t *table, int length, int out_length)
 
 static void compute_precache_pow(uint8_t *output, float gamma)
 {
-        uint32_t v = 0;
-        for (v = 0; v <= 0xffff; v++) {
-                //XXX: don't do integer/float conversion... and round?
-                output[v] = 255. * pow(v/65535., gamma);
-        }
+	uint32_t v = 0;
+	for (v = 0; v < PRECACHE_OUTPUT_SIZE; v++) {
+		//XXX: don't do integer/float conversion... and round?
+		output[v] = 255. * pow(v/(double)PRECACHE_OUTPUT_MAX, gamma);
+	}
 }
 
 void compute_precache_lut(uint8_t *output, uint16_t *table, int length)
 {
-        uint32_t v = 0;
-        for (v = 0; v <= 0xffff; v++) {
-                //XXX: don't do integer/float conversion... round?
-                output[v] = lut_interp_linear16(v, table, length) >> 8;
-        }
+	uint32_t v = 0;
+	for (v = 0; v < PRECACHE_OUTPUT_SIZE; v++) {
+		output[v] = lut_interp_linear_precache_output(v, table, length);
+	}
 }
 
 void compute_precache_linear(uint8_t *output)
 {
-        uint32_t v = 0;
-        for (v = 0; v <= 0xffff; v++) {
-                //XXX: round?
-                output[v] = v >> 8;
-        }
+	uint32_t v = 0;
+	for (v = 0; v < PRECACHE_OUTPUT_SIZE; v++) {
+		//XXX: round?
+		output[v] = v / (PRECACHE_OUTPUT_SIZE/256);
+	}
 }
 
 qcms_bool compute_precache(struct curveType *trc, uint8_t *output)
