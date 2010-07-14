@@ -1129,15 +1129,11 @@ qcms_profile_get_color_space(qcms_profile *profile)
 
 static void lut_release(struct lutType *lut)
 {
-	free(lut->input_table);
-	free(lut->clut_table);
-	free(lut->output_table);
 	free(lut);
 }
 
 static void mAB_release(struct lutmABType *lut)
 {
-	free(lut->clut_table);
 	free(lut->a_curves);
 	free(lut->b_curves);
 	free(lut->m_curves);
