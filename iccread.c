@@ -828,6 +828,7 @@ static struct curveType *curve_from_table(uint16_t *table, int num_entries)
 	curve = malloc(sizeof(struct curveType) + sizeof(uInt16Number)*num_entries);
 	if (!curve)
 		return NULL;
+	curve->type = CURVE_TYPE;
 	curve->count = num_entries;
 	for (i = 0; i < num_entries; i++) {
 		curve->data[i] = table[i];
