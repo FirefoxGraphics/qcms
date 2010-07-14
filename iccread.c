@@ -27,15 +27,14 @@
 #include <string.h> //memset
 #include "qcmsint.h"
 
-//XXX: use a better typename
-typedef uint32_t __be32;
-typedef uint16_t __be16;
+typedef uint32_t be32;
+typedef uint16_t be16;
 
 #if 0
 not used yet
 /* __builtin_bswap isn't available in older gccs
  * so open code it for now */
-static __be32 cpu_to_be32(int32_t v)
+static be32 cpu_to_be32(int32_t v)
 {
 #ifdef IS_LITTLE_ENDIAN
 	return ((v & 0xff) << 24) | ((v & 0xff00) << 8) | ((v & 0xff0000) >> 8) | ((v & 0xff000000) >> 24);
@@ -45,7 +44,7 @@ static __be32 cpu_to_be32(int32_t v)
 }
 #endif
 
-static uint32_t be32_to_cpu(__be32 v)
+static uint32_t be32_to_cpu(be32 v)
 {
 #ifdef IS_LITTLE_ENDIAN
 	return ((v & 0xff) << 24) | ((v & 0xff00) << 8) | ((v & 0xff0000) >> 8) | ((v & 0xff000000) >> 24);
@@ -56,7 +55,7 @@ sdfsdf;asdf;asdf;asdfdas
 #endif
 }
 
-static uint32_t be16_to_cpu(__be16 v)
+static uint16_t be16_to_cpu(be16 v)
 {
 #ifdef IS_LITTLE_ENDIAN
 	return ((v & 0xff) << 8) | ((v & 0xff00) >> 8);
@@ -90,7 +89,9 @@ static uint32_t read_u32(struct mem_source *mem, size_t offset)
 		invalid_source(mem, "Invalid offset");
 		return 0;
 	} else {
-		return be32_to_cpu(*(__be32*)(mem->buf + offset));
+		be32 k;
+		memcpy(&k, mem->buf + offset, sizeof(k));
+		return be32_to_cpu(k);
 	}
 }
 
@@ -100,7 +101,9 @@ static uint16_t read_u16(struct mem_source *mem, size_t offset)
 		invalid_source(mem, "Invalid offset");
 		return 0;
 	} else {
-		return be16_to_cpu(*(__be16*)(mem->buf + offset));
+		be16 k;
+		memcpy(&k, mem->buf + offset, sizeof(k));
+		return be16_to_cpu(k);
 	}
 }
 
@@ -149,11 +152,12 @@ static void check_profile_version(struct mem_source *src)
 	uint8_t minor_revision = read_u8(src, 8 + 1);
 	uint8_t reserved1      = read_u8(src, 8 + 2);
 	uint8_t reserved2      = read_u8(src, 8 + 3);
-
-	if (major_revision > 0x2)
-		invalid_source(src, "Unsupported major revision");
-	if (minor_revision > 0x40)
-		invalid_source(src, "Unsupported minor revision");
+	if (major_revision != 0x4) {
+		if (major_revision > 0x2)
+			invalid_source(src, "Unsupported major revision");
+		if (minor_revision > 0x40)
+			invalid_source(src, "Unsupported minor revision");
+	}
 	if (reserved1 != 0 || reserved2 != 0)
 		invalid_source(src, "Invalid reserved bytes");
 	*/
@@ -220,7 +224,7 @@ struct tag_index {
 static struct tag_index read_tag_table(qcms_profile *profile, struct mem_source *mem)
 {
 	struct tag_index index = {0, NULL};
-	int i;
+	unsigned int i;
 
 	index.count = read_u32(mem, 128);
 	if (index.count > MAX_TAG_COUNT) {
@@ -322,7 +326,7 @@ qcms_bool qcms_profile_is_bogus(qcms_profile *profile)
 
 static struct tag *find_tag(struct tag_index index, uint32_t tag_id)
 {
-	int i;
+	unsigned int i;
 	struct tag *tag = NULL;
 	for (i = 0; i < index.count; i++) {
 		if (index.tags[i].signature == tag_id) {
@@ -366,7 +370,7 @@ static struct matrix read_tag_s15Fixed16ArrayType(struct mem_source *src, struct
 
 static struct XYZNumber read_tag_XYZType(struct mem_source *src, struct tag_index index, uint32_t tag_id)
 {
-	struct XYZNumber num = {0};
+	struct XYZNumber num = {0, 0, 0};
 	struct tag *tag = find_tag(index, tag_id);
 	if (tag) {
 		uint32_t offset = tag->offset;
@@ -1169,7 +1173,7 @@ qcms_profile* qcms_profile_from_file(FILE *file)
 	uint32_t length, remaining_length;
 	qcms_profile *profile;
 	size_t read_length;
-	__be32 length_be;
+	be32 length_be;
 	void *data;
 
 	fread(&length_be, sizeof(length), 1, file);
@@ -1183,7 +1187,7 @@ qcms_profile* qcms_profile_from_file(FILE *file)
 		return NO_MEM_PROFILE;
 
 	/* copy in length to the front so that the buffer will contain the entire profile */
-	*((__be32*)data) = length_be;
+	*((be32*)data) = length_be;
 	remaining_length = length - sizeof(length_be);
 
 	/* read the rest profile */

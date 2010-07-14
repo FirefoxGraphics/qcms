@@ -10,7 +10,9 @@
 #if defined (__SVR4) && defined (__sun)
 /* int_types.h gets included somehow, so avoid redefining the types differently */
 #include <sys/int_types.h>
-#else
+#elif defined (_AIX)
+#include <sys/types.h>
+#elif !defined(ANDROID)
 typedef PRInt8 int8_t;
 typedef PRUint8 uint8_t;
 typedef PRInt16 int16_t;
