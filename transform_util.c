@@ -1,9 +1,15 @@
+#define _ISOC99_SOURCE  /* for INFINITY */
+
 #include <math.h>
 #include <assert.h>
 #include <string.h> //memcpy
 #include "qcmsint.h"
 #include "transform_util.h"
 #include "matrix.h"
+
+#if !defined(INFINITY)
+#define INFINITY HUGE_VAL
+#endif
 
 #define PARAMETRIC_CURVE_TYPE 0x70617261 //'para'
 
