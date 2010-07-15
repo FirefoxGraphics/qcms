@@ -6,6 +6,7 @@
 #include "matrix.h"
 
 #define PARAMETRIC_CURVE_TYPE 0x70617261 //'para'
+#define QCMS_NEGATIVE_INFINITY (-1.f/0.f)
 
 /* value must be a value between 0 and 1 */
 //XXX: is the above a good restriction to have?
@@ -121,7 +122,7 @@ void compute_curve_gamma_table_type_parametric(float gamma_table[256], float par
                 c = 0;
                 e = 0;
                 f = 0;
-                interval = -INFINITY;
+                interval = QCMS_NEGATIVE_INFINITY;
         } else if(count == 1) {
                 a = parameter[1];
                 b = parameter[2];
