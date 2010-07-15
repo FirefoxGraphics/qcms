@@ -1132,6 +1132,15 @@ static void lut_release(struct lutType *lut)
 
 static void mAB_release(struct lutmABType *lut)
 {
+	uint8_t i;
+
+	for (i = 0; i < lut->num_in_channels; i++){
+		free(lut->a_curves[i]);
+	}
+	for (i = 0; i < lut->num_out_channels; i++){
+		free(lut->b_curves[i]);
+		free(lut->m_curves[i]);
+	}
 	free(lut);
 }
 
