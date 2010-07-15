@@ -1134,9 +1134,6 @@ static void lut_release(struct lutType *lut)
 
 static void mAB_release(struct lutmABType *lut)
 {
-	free(lut->a_curves);
-	free(lut->b_curves);
-	free(lut->m_curves);
 	free(lut);
 }
 
