@@ -50,7 +50,6 @@ static uint32_t be32_to_cpu(be32 v)
 	return ((v & 0xff) << 24) | ((v & 0xff00) << 8) | ((v & 0xff0000) >> 8) | ((v & 0xff000000) >> 24);
 	//return __builtin_bswap32(v);
 #else
-sdfsdf;asdf;asdf;asdfdas
 	return v;
 #endif
 }
