@@ -344,7 +344,8 @@ static struct tag *find_tag(struct tag_index index, uint32_t tag_id)
 #define LUT_MBA_TYPE		0x6d424120 // 'mBA '
 #define CHROMATIC_TYPE		0x73663332 // 'sf32'
 
-static struct matrix read_tag_s15Fixed16ArrayType(struct mem_source *src, struct tag_index index, uint32_t tag_id) {
+static struct matrix read_tag_s15Fixed16ArrayType(struct mem_source *src, struct tag_index index, uint32_t tag_id)
+{
 	struct tag *tag = find_tag(index, tag_id);
 	struct matrix matrix;
 	if (tag) {
@@ -859,8 +860,6 @@ static struct curveType *curve_from_gamma(float gamma)
 
 static void qcms_profile_fini(qcms_profile *profile)
 {
-	// REVIEW: This is called when some of these values are NULL.
-	// Is free()-ing NULL safe? I was told it was not safe on all platforms.
 	free(profile->redTRC);
 	free(profile->blueTRC);
 	free(profile->greenTRC);
