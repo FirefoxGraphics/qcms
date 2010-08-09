@@ -353,6 +353,7 @@ static struct matrix read_tag_s15Fixed16ArrayType(struct mem_source *src, struct
 		uint32_t offset = tag->offset;
 		uint32_t type = read_u32(src, offset);
 
+		// Check mandatory type signature for s16Fixed16ArrayType
 		if (type != CHROMATIC_TYPE) {
 			invalid_source(src, "unexpected type, expected 'sf32'");
 		}
@@ -387,9 +388,12 @@ static struct XYZNumber read_tag_XYZType(struct mem_source *src, struct tag_inde
 	return num;
 }
 
+// Read the tag at a given offset rather then the tag_index. 
+// This method is used when reading mAB tags where nested curveType are
+// present that are not part of the tag_index.
 static struct curveType *read_tag_curveType_At(struct mem_source *src, uint32_t offset, uint32_t *len)
 {
-	static const size_t COUNT_TO_LENGTH[5] = {1, 3, 4, 5, 7};
+	static const size_t count_to_length[5] = {1, 3, 4, 5, 7};
 	struct curveType *curve = NULL;
 	uint32_t type = read_u32(src, offset);
 	uint32_t count;
@@ -436,10 +440,10 @@ static struct curveType *read_tag_curveType_At(struct mem_source *src, uint32_t 
 		curve->count = count;
 		curve->type = type;
 
-		for (i=0; i<COUNT_TO_LENGTH[count]; i++) {
+		for (i=0; i < count_to_length[count]; i++) {
 			curve->parameter[i] = s15Fixed16Number_to_float(read_s15Fixed16Number(src, offset + 12 + i*4));	
 		}
-		*len = 12 + COUNT_TO_LENGTH[count] * 4;
+		*len = 12 + count_to_length[count] * 4;
 
 		if ((count == 1 || count == 2) && curve->parameter[1] == 0) {
 			invalid_source(src, "parametricCurve definition causes division by zero.");
@@ -466,6 +470,25 @@ static struct curveType *read_tag_curveType(struct mem_source *src, struct tag_i
 
 #define MAX_CLUT_SIZE 500000 // arbitrary
 #define MAX_CHANNELS 10 // arbitrary
+static void read_nested_curveType(struct mem_source *src, struct curveType *(*curveArray)[10], uint8_t num_channels, uint32_t curve_offset)
+{
+	uint32_t channel_offset = 0;
+	int i;
+	for (i = 0; i < num_channels; i++) {
+		uint32_t tag_len;
+
+		(*curveArray)[i] = read_tag_curveType_At(src, curve_offset + channel_offset, &tag_len);
+		if (!(*curveArray)[i]) {
+			invalid_source(src, "invalid nested curveType curve");
+		}
+
+		channel_offset += tag_len;
+		// 4 byte aligned
+		if ((tag_len % 4) != 0) channel_offset += 4 - (tag_len % 4);
+	}
+
+}
+
 /* See section 10.10 for specs */
 static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag_index index, uint32_t tag_id)
 {
@@ -479,7 +502,6 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 	uint8_t clut_precision;
 	uint32_t type = read_u32(src, offset);
 	uint8_t num_in_channels, num_out_channels;
-	uint32_t channel_offset;
 	struct lutmABType *lut;
 	int i;
 	
@@ -495,6 +517,7 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 	// We require 3in/out channels since we only support RGB->XYZ (or RGB->LAB)	
 	// XXX: If we remove this restriction make sure that the number of channels
 	//      is less or equal to the maximum number of mAB curves in qcmsint.h
+	//      also check for clut_size overflow.
 	if (num_in_channels != 3 || num_out_channels != 3)
 		return NULL;
 
@@ -522,6 +545,7 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 		return NULL;
 
 	if (clut_offset) {
+		// clut_size can not overflow since lg(256^3) = 24 bits.
 		for (i = 0; i < num_in_channels; i++) {
 			clut_size *= read_u8(src, clut_offset + i);
 		}
@@ -532,8 +556,9 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 
 	if (!src->valid)
 		return NULL;
-	// REVIEW Should we put an upper bound on the malloc size to prevent mallicious profile from
-	//        doing big memory allocations?
+	if (clut_size > MAX_CLUT_SIZE)
+		return NULL;
+
 	lut = malloc(sizeof(struct lutmABType) + (clut_size) * sizeof(float));
 	if (!lut)
 		return NULL;
@@ -565,49 +590,13 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 	}
 
 	if (a_offset) {
-		channel_offset = 0;
-		for (i = 0; i < num_in_channels; i++) {
-			uint32_t tag_len;
-
-			lut->a_curves[i] = read_tag_curveType_At(src, a_offset + channel_offset, &tag_len);
-			if (!lut->a_curves[i]) {
-				invalid_source(src, "invalid A curves");
-			}
-
-			channel_offset += tag_len;
-			// 4 byte aligned
-			if ((tag_len % 4) != 0) channel_offset += 4 - (tag_len % 4);
-		}
+		read_nested_curveType(src, &lut->a_curves, num_in_channels, a_offset);
 	}
 	if (m_offset) {
-		channel_offset = 0;
-		for (i = 0; i < num_out_channels; i++) {
-			uint32_t tag_len;
-
-			lut->m_curves[i] = read_tag_curveType_At(src, m_offset + channel_offset, &tag_len);
-			if (!lut->m_curves[i]) {
-				invalid_source(src, "invalid M curves");
-			}
-
-			channel_offset += tag_len;
-			// 4 byte aligned
-			if ((tag_len % 4) != 0) channel_offset += 4 - (tag_len % 4);
-		}
+		read_nested_curveType(src, &lut->m_curves, num_out_channels, m_offset);
 	}
 	if (b_offset) {
-		channel_offset = 0;
-		for (i = 0; i < num_out_channels; i++) {
-			uint32_t tag_len;
-
-			lut->b_curves[i] = read_tag_curveType_At(src, b_offset + channel_offset, &tag_len);
-			if (!lut->b_curves[i]) {
-				invalid_source(src, "invalid B curves");
-			}
-
-			channel_offset += tag_len;
-			// 4 byte aligned
-			if ((tag_len % 4) != 0) channel_offset += 4 - (tag_len % 4);
-		}
+		read_nested_curveType(src, &lut->b_curves, num_out_channels, b_offset);
 	} else {
 		invalid_source(src, "B curves required");
 	}
@@ -628,19 +617,12 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 	}
 
 	if (!src->valid) {
-		// Cleanup
 		for (i = 0; i < num_in_channels; i++) {
-			if (lut->a_curves[i]) {
-				free(lut->a_curves[i]);
-			}
+			free(lut->a_curves[i]);
 		}
 		for (i = 0; i < num_out_channels; i++) {
-			if (lut->m_curves[i]) {
-				free(lut->m_curves[i]);
-			}
-			if (lut->b_curves[i]) {
-				free(lut->b_curves[i]);
-			}
+			free(lut->m_curves[i]);
+			free(lut->b_curves[i]);
 		}
 		free(lut);
 		return NULL;
@@ -883,7 +865,7 @@ qcms_profile* qcms_profile_create_rgb_with_gamma(
 
 	//XXX: should store the whitepoint
 	if (!set_rgb_colorants(profile, white_point, primaries)) {
-		qcms_profile_fini(profile);
+		qcms_profile_release(profile);
 		return INVALID_PROFILE;
 	}
 
@@ -892,7 +874,7 @@ qcms_profile* qcms_profile_create_rgb_with_gamma(
 	profile->greenTRC = curve_from_gamma(gamma);
 
 	if (!profile->redTRC || !profile->blueTRC || !profile->greenTRC) {
-		qcms_profile_fini(profile);
+		qcms_profile_release(profile);
 		return NO_MEM_PROFILE;
 	}
 	profile->class = DISPLAY_DEVICE_PROFILE;
@@ -912,7 +894,7 @@ qcms_profile* qcms_profile_create_rgb_with_table(
 
 	//XXX: should store the whitepoint
 	if (!set_rgb_colorants(profile, white_point, primaries)) {
-		qcms_profile_fini(profile);
+		qcms_profile_release(profile);
 		return INVALID_PROFILE;
 	}
 
@@ -921,7 +903,7 @@ qcms_profile* qcms_profile_create_rgb_with_table(
 	profile->greenTRC = curve_from_table(table, num_entries);
 
 	if (!profile->redTRC || !profile->blueTRC || !profile->greenTRC) {
-		qcms_profile_fini(profile);
+		qcms_profile_release(profile);
 		return NO_MEM_PROFILE;
 	}
 	profile->class = DISPLAY_DEVICE_PROFILE;
@@ -1110,7 +1092,7 @@ invalid_tag_table:
 invalid_profile:
 	// REVIEW Why is this fini? This should be qcms_profile_release right?
 	// We could fail after some tags have been parsed and leak.
-	qcms_profile_fini(profile);
+	qcms_profile_release(profile);
 	return INVALID_PROFILE;
 }
 
