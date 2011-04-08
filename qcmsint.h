@@ -141,6 +141,8 @@ struct _qcms_profile {
 #define inline _inline
 #endif
 
+/* produces the nearest float to 'a' with a maximum error
+ * of 1/1024 which happens for large values like 0x40000040 */
 static inline float s15Fixed16Number_to_float(s15Fixed16Number a)
 {
 	return ((int32_t)a)/65536.f;
