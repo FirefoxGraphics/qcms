@@ -820,12 +820,12 @@ static struct curveType *curve_from_table(uint16_t *table, int num_entries)
 
 static uint16_t float_to_u8Fixed8Number(float a)
 {
-	if (a > (255. + 255./256))
+	if (a > (255.f + 255.f/256))
 		return 0xffff;
-	else if (a < 0.)
+	else if (a < 0.f)
 		return 0;
 	else
-		return floor(a*256. + .5);
+		return floor(a*256.f + .5f);
 }
 
 static struct curveType *curve_from_gamma(float gamma)
@@ -1159,9 +1159,11 @@ qcms_profile* qcms_profile_from_file(FILE *file)
 	be32 length_be;
 	void *data;
 
-	fread(&length_be, sizeof(length), 1, file);
+	if (fread(&length_be, 1, sizeof(length_be), file) != sizeof(length_be))
+		return BAD_VALUE_PROFILE;
+
 	length = be32_to_cpu(length_be);
-	if (length > MAX_PROFILE_SIZE)
+	if (length > MAX_PROFILE_SIZE || length < sizeof(length_be))
 		return BAD_VALUE_PROFILE;
 
 	/* allocate room for the entire profile */
