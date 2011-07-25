@@ -1114,7 +1114,7 @@ qcms_transform* qcms_transform_create(
 		precache = true;
 	}
 
-	if (in->A2B0 || out->B2A0 || in->mAB || out->mAB) {
+	if (qcms_supports_iccv4 && (in->A2B0 || out->B2A0 || in->mAB || out->mAB)) {
 		// Precache the transformation to a CLUT 33x33x33 in size.
 		// 33 is used by many profiles and works well in pratice. 
 		// This evenly divides 256 into blocks of 8x8x8.
@@ -1263,4 +1263,10 @@ __attribute__((__force_align_arg_pointer__))
 void qcms_transform_data(qcms_transform *transform, void *src, void *dest, size_t length)
 {
 	transform->transform_fn(transform, src, dest, length);
+}
+
+qcms_bool qcms_supports_iccv4;
+void qcms_enable_iccv4()
+{
+	qcms_supports_iccv4 = true;
 }

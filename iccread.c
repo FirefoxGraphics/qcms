@@ -1034,7 +1034,7 @@ qcms_profile* qcms_profile_from_memory(const void *mem, size_t size)
 					profile->mBA = read_tag_lutmABType(src, index, TAG_B2A0);
 				}
 			}
-			if (find_tag(index, TAG_rXYZ)) {
+			if (find_tag(index, TAG_rXYZ) || !qcms_supports_iccv4) {
 				profile->redColorant = read_tag_XYZType(src, index, TAG_rXYZ);
 				profile->greenColorant = read_tag_XYZType(src, index, TAG_gXYZ);
 				profile->blueColorant = read_tag_XYZType(src, index, TAG_bXYZ);
@@ -1043,7 +1043,7 @@ qcms_profile* qcms_profile_from_memory(const void *mem, size_t size)
 			if (!src->valid)
 				goto invalid_tag_table;
 
-			if (find_tag(index, TAG_rTRC)) {
+			if (find_tag(index, TAG_rTRC) || !qcms_supports_iccv4) {
 				profile->redTRC = read_tag_curveType(src, index, TAG_rTRC);
 				profile->greenTRC = read_tag_curveType(src, index, TAG_gTRC);
 				profile->blueTRC = read_tag_curveType(src, index, TAG_bTRC);

@@ -171,6 +171,8 @@ struct lutType { // used by lut8Type/lut16Type (mft2) only
 	float *input_table;
 	float *clut_table;
 	float *output_table;
+
+	float table_data[];
 };
 #if 0
 /* this is from an intial idea of having the struct correspond to the data in
@@ -265,3 +267,5 @@ void qcms_transform_data_rgba_out_lut_sse1(qcms_transform *transform,
                                           unsigned char *src,
                                           unsigned char *dest,
                                           size_t length);
+
+extern qcms_bool qcms_supports_iccv4;
