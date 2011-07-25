@@ -153,11 +153,13 @@ static void check_CMM_type_signature(struct mem_source *src)
 static void check_profile_version(struct mem_source *src)
 {
 
-	/* Checking the version doesn't buy us anything
+	/*
 	uint8_t major_revision = read_u8(src, 8 + 0);
 	uint8_t minor_revision = read_u8(src, 8 + 1);
+	*/
 	uint8_t reserved1      = read_u8(src, 8 + 2);
 	uint8_t reserved2      = read_u8(src, 8 + 3);
+	/* Checking the version doesn't buy us anything
 	if (major_revision != 0x4) {
 		if (major_revision > 0x2)
 			invalid_source(src, "Unsupported major revision");
@@ -497,6 +499,20 @@ static void read_nested_curveType(struct mem_source *src, struct curveType *(*cu
 
 }
 
+static void mAB_release(struct lutmABType *lut)
+{
+	uint8_t i;
+
+	for (i = 0; i < lut->num_in_channels; i++){
+		free(lut->a_curves[i]);
+	}
+	for (i = 0; i < lut->num_out_channels; i++){
+		free(lut->b_curves[i]);
+		free(lut->m_curves[i]);
+	}
+	free(lut);
+}
+
 /* See section 10.10 for specs */
 static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag_index index, uint32_t tag_id)
 {
@@ -530,7 +546,7 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 
 	// some of this data is optional and is denoted by a zero offset
 	// we also use this to track their existance
-	a_cuvre_offset = read_u32(src, offset + 28);
+	a_curve_offset = read_u32(src, offset + 28);
 	clut_offset = read_u32(src, offset + 24);
 	m_curve_offset = read_u32(src, offset + 20);
 	matrix_offset = read_u32(src, offset + 16);
@@ -681,9 +697,9 @@ static struct lutType *read_tag_lutType(struct mem_source *src, struct tag_index
 	}
 
 	/* compute the offsets of tables */
-	lut->input_table  = &lut->table_data[0]
+	lut->input_table  = &lut->table_data[0];
 	lut->clut_table   = &lut->table_data[in_chan*num_input_table_entries];
-	lut->output_table = &lut->table_data[in_char*num_input_table_entries + clut_size*out_chan];
+	lut->output_table = &lut->table_data[in_chan*num_input_table_entries + clut_size*out_chan];
 
 	lut->num_input_table_entries  = num_input_table_entries;
 	lut->num_output_table_entries = num_output_table_entries;
@@ -717,7 +733,7 @@ static struct lutType *read_tag_lutType(struct mem_source *src, struct tag_index
 		} else {
 			lut->clut_table[i+0] = uInt16Number_to_float(read_uInt16Number(src, clut_offset + i*entry_size + 0));
 			lut->clut_table[i+1] = uInt16Number_to_float(read_uInt16Number(src, clut_offset + i*entry_size + 2));
-			lut->clut_table[i+2] = uInt16Number_to_flaot(read_uInt16Number(src, clut_offset + i*entry_size + 4));
+			lut->clut_table[i+2] = uInt16Number_to_float(read_uInt16Number(src, clut_offset + i*entry_size + 4));
 		}
 	}
 
@@ -751,6 +767,8 @@ qcms_profile *qcms_profile_create(void)
 {
 	return calloc(sizeof(qcms_profile), 1);
 }
+
+
 
 /* build sRGB gamma table */
 /* based on cmsBuildParametricGamma() */
@@ -1094,20 +1112,6 @@ static void lut_release(struct lutType *lut)
 	free(lut);
 }
 
-static void mAB_release(struct lutmABType *lut)
-{
-	uint8_t i;
-
-	for (i = 0; i < lut->num_in_channels; i++){
-		free(lut->a_curves[i]);
-	}
-	for (i = 0; i < lut->num_out_channels; i++){
-		free(lut->b_curves[i]);
-		free(lut->m_curves[i]);
-	}
-	free(lut);
-}
-
 void qcms_profile_release(qcms_profile *profile)
 {
 	if (profile->output_table_r)
@@ -1133,6 +1137,7 @@ void qcms_profile_release(qcms_profile *profile)
 	free(profile->grayTRC);
 	free(profile);
 }
+
 
 #include <stdio.h>
 qcms_profile* qcms_profile_from_file(FILE *file)
