@@ -832,14 +832,6 @@ static struct curveType *curve_from_gamma(float gamma)
 	return curve;
 }
 
-static void qcms_profile_fini(qcms_profile *profile)
-{
-	free(profile->redTRC);
-	free(profile->blueTRC);
-	free(profile->greenTRC);
-	free(profile->grayTRC);
-	free(profile);
-}
 
 //XXX: it would be nice if we had a way of ensuring
 // everything in a profile was initialized regardless of how it was created
@@ -1082,8 +1074,6 @@ qcms_profile* qcms_profile_from_memory(const void *mem, size_t size)
 invalid_tag_table:
 	free(index.tags);
 invalid_profile:
-	// REVIEW Why is this fini? This should be qcms_profile_release right?
-	// We could fail after some tags have been parsed and leak.
 	qcms_profile_release(profile);
 	return INVALID_PROFILE;
 }
@@ -1126,20 +1116,22 @@ void qcms_profile_release(qcms_profile *profile)
 		precache_release(profile->output_table_g);
 	if (profile->output_table_b)
 		precache_release(profile->output_table_b);
-	
-	// Should this go into _release or _fini?
+
 	if (profile->A2B0)
 		lut_release(profile->A2B0);
 	if (profile->B2A0)
 		lut_release(profile->B2A0);
 
-	// Should this go into _release or _fini?
 	if (profile->mAB)
 		mAB_release(profile->mAB);
 	if (profile->mBA)
 		mAB_release(profile->mBA);
 
-	qcms_profile_fini(profile);
+	free(profile->redTRC);
+	free(profile->blueTRC);
+	free(profile->greenTRC);
+	free(profile->grayTRC);
+	free(profile);
 }
 
 #include <stdio.h>
