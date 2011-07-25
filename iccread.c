@@ -27,6 +27,10 @@
 #include <string.h> //memset
 #include "qcmsint.h"
 
+/* It might be worth having a unified limit on content controlled
+ * allocation per profile. This would remove the need for many
+ * of the arbitrary limits that we used */
+
 typedef uint32_t be32;
 typedef uint16_t be16;
 
@@ -121,12 +125,15 @@ static s15Fixed16Number read_s15Fixed16Number(struct mem_source *mem, size_t off
 	return read_u32(mem, offset);
 }
 
-#if 0
+static uInt8Number read_uInt8Number(struct mem_source *mem, size_t offset)
+{
+	return read_u8(mem, offset);
+}
+
 static uInt16Number read_uInt16Number(struct mem_source *mem, size_t offset)
 {
 	return read_u16(mem, offset);
 }
-#endif
 
 #define BAD_VALUE_PROFILE NULL
 #define INVALID_PROFILE NULL
@@ -145,8 +152,8 @@ static void check_CMM_type_signature(struct mem_source *src)
 
 static void check_profile_version(struct mem_source *src)
 {
-	//REVIEW Do we want to check for a specific version range?
-	/*
+
+	/* Checking the version doesn't buy us anything
 	uint8_t major_revision = read_u8(src, 8 + 0);
 	uint8_t minor_revision = read_u8(src, 8 + 1);
 	uint8_t reserved1      = read_u8(src, 8 + 2);
@@ -157,9 +164,9 @@ static void check_profile_version(struct mem_source *src)
 		if (minor_revision > 0x40)
 			invalid_source(src, "Unsupported minor revision");
 	}
+	*/
 	if (reserved1 != 0 || reserved2 != 0)
 		invalid_source(src, "Invalid reserved bytes");
-	*/
 }
 
 #define INPUT_DEVICE_PROFILE   0x73636e72 // 'scnr'
@@ -198,14 +205,14 @@ static void read_color_space(qcms_profile *profile, struct mem_source *mem)
 
 static void read_pcs(qcms_profile *profile, struct mem_source *mem)
 {
-  profile->pcs = read_u32(mem, 20);
-  switch (profile->pcs) {
-    case XYZ_SIGNATURE:
-    case LAB_SIGNATURE:
-      break;
-    default:
-      invalid_source(mem, "Unsupported pcs");
-  }
+	profile->pcs = read_u32(mem, 20);
+	switch (profile->pcs) {
+		case XYZ_SIGNATURE:
+		case LAB_SIGNATURE:
+			break;
+		default:
+			invalid_source(mem, "Unsupported pcs");
+	}
 }
 
 struct tag
@@ -335,12 +342,12 @@ static struct tag *find_tag(struct tag_index index, uint32_t tag_id)
 	return tag;
 }
 
-#define XYZ_TYPE   		0x58595a20 // 'XYZ '
-#define CURVE_TYPE 		0x63757276 // 'curv'
-#define PARAMETRIC_CURVE_TYPE 	0x70617261 // 'para'
+#define XYZ_TYPE		0x58595a20 // 'XYZ '
+#define CURVE_TYPE		0x63757276 // 'curv'
+#define PARAMETRIC_CURVE_TYPE	0x70617261 // 'para'
 #define LUT16_TYPE		0x6d667432 // 'mft2'
-#define LUT8_TYPE  		0x6d667431 // 'mft1'
-#define LUT_MAB_TYPE  		0x6d414220 // 'mAB '
+#define LUT8_TYPE		0x6d667431 // 'mft1'
+#define LUT_MAB_TYPE		0x6d414220 // 'mAB '
 #define LUT_MBA_TYPE		0x6d424120 // 'mBA '
 #define CHROMATIC_TYPE		0x73663332 // 'sf32'
 
@@ -391,16 +398,15 @@ static struct XYZNumber read_tag_XYZType(struct mem_source *src, struct tag_inde
 // Read the tag at a given offset rather then the tag_index. 
 // This method is used when reading mAB tags where nested curveType are
 // present that are not part of the tag_index.
-static struct curveType *read_tag_curveType_At(struct mem_source *src, uint32_t offset, uint32_t *len)
+static struct curveType *read_curveType(struct mem_source *src, uint32_t offset, uint32_t *len)
 {
-	static const size_t count_to_length[5] = {1, 3, 4, 5, 7};
+	static const size_t COUNT_TO_LENGTH[5] = {1, 3, 4, 5, 7};
 	struct curveType *curve = NULL;
 	uint32_t type = read_u32(src, offset);
 	uint32_t count;
 	int i;
 
 	if (type != CURVE_TYPE && type != PARAMETRIC_CURVE_TYPE) {
-		assert(0 && "Unexpected curve type");
 		invalid_source(src, "unexpected type, expected CURV or PARA");
 		return NULL;
 	}
@@ -421,14 +427,13 @@ static struct curveType *read_tag_curveType_At(struct mem_source *src, uint32_t 
 		curve->type = type;
 
 		for (i=0; i<count; i++) {
-			curve->data[i] = read_u16(src, offset + 12 + i *2);
+			curve->data[i] = read_u16(src, offset + 12 + i*2);
 		}
 		*len = 12 + count * 2;
 	} else { //PARAMETRIC_CURVE_TYPE
 		count = read_u16(src, offset+8);
 
 		if (count > 4) {
-			assert(0 && "Parametric function type not supported.");
 			invalid_source(src, "parametric function type not supported.");
 			return NULL;
 		}
@@ -440,13 +445,16 @@ static struct curveType *read_tag_curveType_At(struct mem_source *src, uint32_t 
 		curve->count = count;
 		curve->type = type;
 
-		for (i=0; i < count_to_length[count]; i++) {
+		for (i=0; i < COUNT_TO_LENGTH[count]; i++) {
 			curve->parameter[i] = s15Fixed16Number_to_float(read_s15Fixed16Number(src, offset + 12 + i*4));	
 		}
-		*len = 12 + count_to_length[count] * 4;
+		*len = 12 + COUNT_TO_LENGTH[count] * 4;
 
-		if ((count == 1 || count == 2) && curve->parameter[1] == 0) {
-			invalid_source(src, "parametricCurve definition causes division by zero.");
+		if ((count == 1 || count == 2)) {
+			/* we have a type 1 or type 2 function that has a division by 'a' */
+			float a = curve->parameter[1];
+			if (a == 0.f)
+				invalid_source(src, "parametricCurve definition causes division by zero.");
 		}
 	}
 
@@ -459,9 +467,8 @@ static struct curveType *read_tag_curveType(struct mem_source *src, struct tag_i
 	struct curveType *curve = NULL;
 	if (tag) {
 		uint32_t len;
-		return read_tag_curveType_At(src, tag->offset, &len);
+		return read_curveType(src, tag->offset, &len);
 	} else {
-		assert(0 && "Unexpected curve type");
 		invalid_source(src, "missing curvetag");
 	}
 
@@ -470,21 +477,22 @@ static struct curveType *read_tag_curveType(struct mem_source *src, struct tag_i
 
 #define MAX_CLUT_SIZE 500000 // arbitrary
 #define MAX_CHANNELS 10 // arbitrary
-static void read_nested_curveType(struct mem_source *src, struct curveType *(*curveArray)[10], uint8_t num_channels, uint32_t curve_offset)
+static void read_nested_curveType(struct mem_source *src, struct curveType *(*curveArray)[MAX_CHANNELS], uint8_t num_channels, uint32_t curve_offset)
 {
 	uint32_t channel_offset = 0;
 	int i;
 	for (i = 0; i < num_channels; i++) {
 		uint32_t tag_len;
 
-		(*curveArray)[i] = read_tag_curveType_At(src, curve_offset + channel_offset, &tag_len);
+		(*curveArray)[i] = read_curveType(src, curve_offset + channel_offset, &tag_len);
 		if (!(*curveArray)[i]) {
 			invalid_source(src, "invalid nested curveType curve");
 		}
 
 		channel_offset += tag_len;
 		// 4 byte aligned
-		if ((tag_len % 4) != 0) channel_offset += 4 - (tag_len % 4);
+		if ((tag_len % 4) != 0)
+			channel_offset += 4 - (tag_len % 4);
 	}
 
 }
@@ -494,8 +502,7 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 {
 	struct tag *tag = find_tag(index, tag_id);
 	uint32_t offset = tag->offset;
-	// XXX: m_offset != matrix_offset
-	uint32_t a_offset, b_offset, m_offset;
+	uint32_t a_curve_offset, b_curve_offset, m_curve_offset;
 	uint32_t matrix_offset;
 	uint32_t clut_offset;
 	uint32_t clut_size = 1;
@@ -504,7 +511,7 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 	uint8_t num_in_channels, num_out_channels;
 	struct lutmABType *lut;
 	int i;
-	
+
 	if (type != LUT_MAB_TYPE && type != LUT_MBA_TYPE) {
 		return NULL;
 	}
@@ -514,56 +521,56 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 	if (num_in_channels > MAX_CHANNELS || num_out_channels > MAX_CHANNELS)
 		return NULL;
 
-	// We require 3in/out channels since we only support RGB->XYZ (or RGB->LAB)	
+	// We require 3in/out channels since we only support RGB->XYZ (or RGB->LAB)
 	// XXX: If we remove this restriction make sure that the number of channels
 	//      is less or equal to the maximum number of mAB curves in qcmsint.h
 	//      also check for clut_size overflow.
 	if (num_in_channels != 3 || num_out_channels != 3)
 		return NULL;
 
-	// XXX: Be careful with these pointers since they could point 
-	// to 'dangerous' memory.
-	a_offset = read_u32(src, offset + 28);
+	// some of this data is optional and is denoted by a zero offset
+	// we also use this to track their existance
+	a_cuvre_offset = read_u32(src, offset + 28);
 	clut_offset = read_u32(src, offset + 24);
-	m_offset = read_u32(src, offset + 20);
+	m_curve_offset = read_u32(src, offset + 20);
 	matrix_offset = read_u32(src, offset + 16);
-	b_offset = read_u32(src, offset + 12);
+	b_curve_offset = read_u32(src, offset + 12);
 
 	// Convert offsets relative to the tag to relative to the profile
-	if (a_offset) 
-		a_offset += offset;
-	if (clut_offset) 
+	// preserve zero for optional fields
+	if (a_curve_offset)
+		a_curve_offset += offset;
+	if (clut_offset)
 		clut_offset += offset;
-	if (m_offset) 
-		m_offset += offset;
-	if (matrix_offset) 
+	if (m_curve_offset)
+		m_curve_offset += offset;
+	if (matrix_offset)
 		matrix_offset += offset;
-	if (b_offset) 
-		b_offset += offset;
-
-	if (!src->valid)
-		return NULL;
+	if (b_curve_offset)
+		b_curve_offset += offset;
 
 	if (clut_offset) {
-		// clut_size can not overflow since lg(256^3) = 24 bits.
+		assert (num_in_channels == 3);
+		// clut_size can not overflow since lg(256^num_in_channels) = 24 bits.
 		for (i = 0; i < num_in_channels; i++) {
 			clut_size *= read_u8(src, clut_offset + i);
 		}
 	} else {
 		clut_size = 0;
 	}
+
+	// 24bits * 3 won't overflow either
 	clut_size = clut_size * num_out_channels;
 
-	if (!src->valid)
-		return NULL;
 	if (clut_size > MAX_CLUT_SIZE)
 		return NULL;
 
 	lut = malloc(sizeof(struct lutmABType) + (clut_size) * sizeof(float));
 	if (!lut)
 		return NULL;
+	// we'll fill in the rest below
 	memset(lut, 0, sizeof(struct lutmABType));
-	lut->clut_table   = (float*)(((char*)lut) + sizeof(struct lutmABType));
+	lut->clut_table   = &lut->clut_table_data[0];
 
 	for (i = 0; i < num_in_channels; i++) {
 		lut->num_grid_points[i] = read_u8(src, clut_offset + i);
@@ -574,7 +581,9 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 
 	lut->num_in_channels = num_in_channels;
 	lut->num_out_channels = num_out_channels;
+
 	if (matrix_offset) {
+		// read the matrix if we have it
 		lut->e00 = read_s15Fixed16Number(src, matrix_offset+4*0);
 		lut->e01 = read_s15Fixed16Number(src, matrix_offset+4*1);
 		lut->e02 = read_s15Fixed16Number(src, matrix_offset+4*2);
@@ -589,27 +598,27 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 		lut->e23 = read_s15Fixed16Number(src, matrix_offset+4*11);
 	}
 
-	if (a_offset) {
-		read_nested_curveType(src, &lut->a_curves, num_in_channels, a_offset);
+	if (a_curve_offset) {
+		read_nested_curveType(src, &lut->a_curves, num_in_channels, a_curve_offset);
 	}
-	if (m_offset) {
-		read_nested_curveType(src, &lut->m_curves, num_out_channels, m_offset);
+	if (m_curve_offset) {
+		read_nested_curveType(src, &lut->m_curves, num_out_channels, m_curve_offset);
 	}
-	if (b_offset) {
-		read_nested_curveType(src, &lut->b_curves, num_out_channels, b_offset);
+	if (b_curve_offset) {
+		read_nested_curveType(src, &lut->b_curves, num_out_channels, b_curve_offset);
 	} else {
 		invalid_source(src, "B curves required");
 	}
-		
+
 	if (clut_offset) {
 		clut_precision = read_u8(src, clut_offset + 16);
 		if (clut_precision == 1) {
 			for (i = 0; i < clut_size; i++) {
-				lut->clut_table[i] = read_u8(src, clut_offset + 20 + i*1) / 255.0f;	
+				lut->clut_table[i] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + 20 + i*1));
 			}
 		} else if (clut_precision == 2) {
 			for (i = 0; i < clut_size; i++) {
-				lut->clut_table[i] = read_u16(src, clut_offset + 20 + i*2) / 65535.0f;	
+				lut->clut_table[i] = uInt16Number_to_float(read_uInt16Number(src, clut_offset + 20 + i*2));
 			}
 		} else {
 			invalid_source(src, "Invalid clut precision");
@@ -617,14 +626,7 @@ static struct lutmABType *read_tag_lutmABType(struct mem_source *src, struct tag
 	}
 
 	if (!src->valid) {
-		for (i = 0; i < num_in_channels; i++) {
-			free(lut->a_curves[i]);
-		}
-		for (i = 0; i < num_out_channels; i++) {
-			free(lut->m_curves[i]);
-			free(lut->b_curves[i]);
-		}
-		free(lut);
+		mAB_release(lut);
 		return NULL;
 	}
 
@@ -645,15 +647,18 @@ static struct lutType *read_tag_lutType(struct mem_source *src, struct tag_index
 	struct lutType *lut;
 	int i;
 
-	/* I'm not sure why but LUT8 tables have a fixed number of entries despite
-	 * having room for the following fields the fields */
+	/* I'm not sure why the spec specifies a fixed number of entries for LUT8 tables even though
+	 * they have room for the num_entries fields */
 	if (type == LUT8_TYPE) {
 		num_input_table_entries = 256;
 		num_output_table_entries = 256;
+		entry_size = 1;
 	} else if (type == LUT16_TYPE) {
 		num_input_table_entries  = read_u16(src, offset + 48);
 		num_output_table_entries = read_u16(src, offset + 50);
+		entry_size = 2;
 	} else {
+		invalid_source(src, "Unexpected lut type");
 		return NULL;
 	}
 
@@ -661,23 +666,12 @@ static struct lutType *read_tag_lutType(struct mem_source *src, struct tag_index
 	out_chan    = read_u8(src, offset + 9);
 	grid_points = read_u8(src, offset + 10);
 
-	if (!src->valid)
-		return NULL;
-
 	clut_size = pow(grid_points, in_chan);
 	if (clut_size > MAX_CLUT_SIZE) {
 		return NULL;
 	}
-	
-	if (in_chan != 3 || out_chan != 3) {
-		return NULL;
-	}
 
-	if (type == LUT16_TYPE) {
-		entry_size = 2;
-	} else if (type == LUT8_TYPE) {
-		entry_size = 1;
-	} else {
+	if (in_chan != 3 || out_chan != 3) {
 		return NULL;
 	}
 
@@ -687,11 +681,9 @@ static struct lutType *read_tag_lutType(struct mem_source *src, struct tag_index
 	}
 
 	/* compute the offsets of tables */
-	//REVIEW Where is the allign code? This assertion is failing.
-	//assert((sizeof(struct lutType) & 0xf) == 0);
-	lut->input_table  = (float*)(((char*)lut) + sizeof(struct lutType));
-	lut->clut_table   = (float*)(((char*)(lut->input_table)) + in_chan*num_input_table_entries*sizeof(*(lut->input_table)));
-	lut->output_table = (float*)(((char*)(lut->clut_table)) + clut_size*out_chan*sizeof(*(lut->clut_table)));
+	lut->input_table  = &lut->table_data[0]
+	lut->clut_table   = &lut->table_data[in_chan*num_input_table_entries];
+	lut->output_table = &lut->table_data[in_char*num_input_table_entries + clut_size*out_chan];
 
 	lut->num_input_table_entries  = num_input_table_entries;
 	lut->num_output_table_entries = num_output_table_entries;
@@ -710,31 +702,31 @@ static struct lutType *read_tag_lutType(struct mem_source *src, struct tag_index
 
 	for (i = 0; i < lut->num_input_table_entries * in_chan; i++) {
 		if (type == LUT8_TYPE) {
-			lut->input_table[i] =  read_u8(src, offset + 52 + i * entry_size) / 255.0f;
+			lut->input_table[i] = uInt8Number_to_float(read_uInt8Number(src, offset + 52 + i * entry_size));
 		} else {
-			lut->input_table[i] = read_u16(src, offset + 52 + i * entry_size) / 65535.0f;
+			lut->input_table[i] = uInt16Number_to_float(read_uInt16Number(src, offset + 52 + i * entry_size));
 		}
 	}
 
 	clut_offset = offset + 52 + lut->num_input_table_entries * in_chan * entry_size;
 	for (i = 0; i < clut_size * out_chan; i+=3) {
 		if (type == LUT8_TYPE) {
-			lut->clut_table[i*3+0] =  read_u8(src, clut_offset + i*entry_size + 0) / 255.0f;
-			lut->clut_table[i*3+1] =  read_u8(src, clut_offset + i*entry_size + 1) / 255.0f;
-			lut->clut_table[i*3+2] =  read_u8(src, clut_offset + i*entry_size + 2) / 255.0f;
+			lut->clut_table[i*3+0] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 0));
+			lut->clut_table[i*3+1] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 1));
+			lut->clut_table[i*3+2] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 2));
 		} else {
-			lut->clut_table[i+0] =  read_u16(src, clut_offset + i*entry_size + 0) / 65535.0f;
-			lut->clut_table[i+1] =  read_u16(src, clut_offset + i*entry_size + 2) / 65535.0f;
-			lut->clut_table[i+2] =  read_u16(src, clut_offset + i*entry_size + 4) / 65535.0f;
+			lut->clut_table[i+0] = uInt16Number_to_float(read_uInt16Number(src, clut_offset + i*entry_size + 0));
+			lut->clut_table[i+1] = uInt16Number_to_float(read_uInt16Number(src, clut_offset + i*entry_size + 2));
+			lut->clut_table[i+2] = uInt16Number_to_flaot(read_uInt16Number(src, clut_offset + i*entry_size + 4));
 		}
 	}
 
 	output_offset = clut_offset + clut_size * out_chan * entry_size;
 	for (i = 0; i < lut->num_output_table_entries * out_chan; i++) {
 		if (type == LUT8_TYPE) {
-			lut->output_table[i] =  read_u8(src, output_offset + i*entry_size) / 255.0f;
+			lut->output_table[i] = uInt8Number_to_float(read_uInt8Number(src, output_offset + i*entry_size));
 		} else {
-			lut->output_table[i] = read_u16(src, output_offset + i*entry_size) / 65535.0f;
+			lut->output_table[i] = uInt16Number_to_float(read_uInt16Number(src, output_offset + i*entry_size));
 		}
 	}
 

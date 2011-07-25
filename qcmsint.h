@@ -105,6 +105,7 @@ struct qcms_modular_transform {
 
 typedef int32_t s15Fixed16Number;
 typedef uint16_t uInt16Number;
+typedef uint8_t uInt8Number;
 
 struct XYZNumber {
 	s15Fixed16Number X;
@@ -116,12 +117,7 @@ struct curveType {
 	uint32_t type;
 	uint32_t count;
 	float parameter[7];
-/* Using the C99 flexible array member syntax with IBM compiler */
-#if defined (__IBMC__) || defined (__IBMCPP__)
 	uInt16Number data[];
-#else
-	uInt16Number data[0];
-#endif
 };
 
 struct lutmABType {
@@ -150,6 +146,7 @@ struct lutmABType {
 	struct curveType *a_curves[10];
 	struct curveType *b_curves[10];
 	struct curveType *m_curves[10];
+	float clut_table_data[];
 };
 
 /* should lut8Type and lut16Type be different types? */
@@ -237,6 +234,17 @@ static inline s15Fixed16Number double_to_s15Fixed16Number(double v)
 {
 	return (int32_t)(v*65536);
 }
+
+static inline float uInt8Number_to_float(uInt8Number a)
+{
+	return ((int32_t)a)/255.f;
+}
+
+static inline float uInt16Number_to_float(uInt16Number a)
+{
+	return ((int32_t)a)/65535.f;
+}
+
 
 void precache_release(struct precache_output *p);
 qcms_bool set_rgb_colorants(qcms_profile *profile, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries);
