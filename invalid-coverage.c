@@ -81,6 +81,10 @@ int main()
 	write_u32(16, RGB_SIGNATURE);
 	assert(!qcms_profile_from_memory(buf, 1500));
 
+#define XYZ_SIGNATURE  0x58595A20
+	write_u32(20, XYZ_SIGNATURE);
+	assert(!qcms_profile_from_memory(buf, 1500));
+
 	write_u32(128, 15000); // tag count
 	assert(!qcms_profile_from_memory(buf, 1500));
 
