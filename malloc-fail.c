@@ -78,9 +78,13 @@ void do_test(void) {
 	unsigned char outt[4];
 	qcms_transform *transform;
 	qcms_profile *input_profile, *output_profile, *rgb;
-	qcms_CIE_xyY white_point = { 0, 0, 1.};
+	qcms_CIE_xyY invalid_white_point = { 0., 0., 1.};
+	qcms_CIE_xyY white_point = { 0.9, 1., 1.};
 	qcms_CIE_xyYTRIPLE primaries = { {.9, .3, 1.}, {.2, .4, 1.}, {.7, .4, 1.}};
 
+	rgb = qcms_profile_create_rgb_with_gamma(invalid_white_point, primaries, 1.8);
+	if (rgb)
+		qcms_profile_release(rgb);
 	rgb = qcms_profile_create_rgb_with_gamma(white_point, primaries, 1.8);
 	input_profile = qcms_profile_sRGB();
 	output_profile = qcms_profile_sRGB();

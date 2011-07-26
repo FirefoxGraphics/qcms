@@ -1,5 +1,5 @@
 
-#COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage 
+COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage
 #COVERAGE_FLAGS=
 OPT_FLAGS=-O0
 OPT_FLAGS=
@@ -14,6 +14,11 @@ PROGRAMS=profile-gen test test-invalid lcms-compare dump-profile div-test covera
 all: $(PROGRAMS)
 
 $(PROGRAMS): $(QCMS_OBJS)
+
+gen-coverage:
+	mkdir -p lcov
+	lcov -d . -c --output-file lcov/lcov.info
+	genhtml -o lcov/ lcov/lcov.info
 
 clean:
 	rm -f $(PROGRAMS) $(QCMS_OBJS)

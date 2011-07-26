@@ -674,6 +674,7 @@ static struct lutType *read_tag_lutType(struct mem_source *src, struct tag_index
 		num_output_table_entries = read_u16(src, offset + 50);
 		entry_size = 2;
 	} else {
+		assert(0); // the caller checks that this doesn't happen
 		invalid_source(src, "Unexpected lut type");
 		return NULL;
 	}
@@ -727,9 +728,9 @@ static struct lutType *read_tag_lutType(struct mem_source *src, struct tag_index
 	clut_offset = offset + 52 + lut->num_input_table_entries * in_chan * entry_size;
 	for (i = 0; i < clut_size * out_chan; i+=3) {
 		if (type == LUT8_TYPE) {
-			lut->clut_table[i*3+0] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 0));
-			lut->clut_table[i*3+1] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 1));
-			lut->clut_table[i*3+2] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 2));
+			lut->clut_table[i+0] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 0));
+			lut->clut_table[i+1] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 1));
+			lut->clut_table[i+2] = uInt8Number_to_float(read_uInt8Number(src, clut_offset + i*entry_size + 2));
 		} else {
 			lut->clut_table[i+0] = uInt16Number_to_float(read_uInt16Number(src, clut_offset + i*entry_size + 0));
 			lut->clut_table[i+1] = uInt16Number_to_float(read_uInt16Number(src, clut_offset + i*entry_size + 2));
@@ -1045,8 +1046,8 @@ qcms_profile* qcms_profile_from_memory(const void *mem, size_t size)
 				}
 			}
 			if (find_tag(index, TAG_B2A0)) {
-				if (read_u32(src, find_tag(index, TAG_A2B0)->offset) == LUT8_TYPE ||
-				    read_u32(src, find_tag(index, TAG_A2B0)->offset) == LUT16_TYPE) {
+				if (read_u32(src, find_tag(index, TAG_B2A0)->offset) == LUT8_TYPE ||
+				    read_u32(src, find_tag(index, TAG_B2A0)->offset) == LUT16_TYPE) {
 					profile->B2A0 = read_tag_lutType(src, index, TAG_B2A0);
 				} else if (read_u32(src, find_tag(index, TAG_B2A0)->offset) == LUT_MBA_TYPE) {
 					profile->mBA = read_tag_lutmABType(src, index, TAG_B2A0);
@@ -1076,6 +1077,7 @@ qcms_profile* qcms_profile_from_memory(const void *mem, size_t size)
 				goto invalid_tag_table;
 
 		} else {
+			assert(0 && "read_color_space protects against entering here");
 			goto invalid_tag_table;
 		}
 	} else {
