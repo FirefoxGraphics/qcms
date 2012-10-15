@@ -40,7 +40,6 @@
 #elif !defined(__intptr_t_defined) && !defined(_UINTPTR_T_DEFINED)
 typedef unsigned long uintptr_t;
 #endif
-#endif
 
 #else // MOZ_QCMS
 
