@@ -34,9 +34,7 @@
 #include <sys/int_types.h>
 #elif defined (_AIX)
 #include <sys/types.h>
-#elif !defined(ANDROID) && !defined(__OpenBSD__)
-
-#ifdef __OS2__
+#elif defined(__OS2__)
 /* OS/2's stdlib typdefs uintptr_t. So we'll just include that so we don't collide */
 #include <stdlib.h>
 #elif !defined(__intptr_t_defined) && !defined(_UINTPTR_T_DEFINED)
