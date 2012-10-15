@@ -1174,7 +1174,7 @@ qcms_transform* qcms_transform_create(
 #ifdef X86
 		    if (sse_version_available() >= 2) {
 			    if (in_type == QCMS_DATA_RGB_8)
-				    transform->transform_fn = qcms_transform_data_rgb_out_lut_sse2;
+				    transform->transform_fn = qcms_transform_data_rgb_out_lut_sse41_int;
 			    else
 				    transform->transform_fn = qcms_transform_data_rgba_out_lut_sse2;
 

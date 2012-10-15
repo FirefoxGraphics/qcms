@@ -22,7 +22,7 @@
 
 
 #include <emmintrin.h>
-
+#include <smmintrin.h>
 #include "qcmsint.h"
 
 /* pre-shuffled: just load these into XMM reg instead of load-scalar/shufps sequence */
@@ -263,4 +263,146 @@ void qcms_transform_data_rgba_out_lut_sse2(qcms_transform *transform,
     dest[OUTPUT_B_INDEX] = otdata_b[output[2]];
 }
 
+
+/*
+we'll need to switch to (2^n+1) sized lookup table
+so that we can avoid the divide
+16bit times 16bit is 32 bits
+we can drop 2 bits from the result and then add together
+
+
+        vec_r = _mm_madd_epi16(vec_r, mat0);
+        vec_g = _mm_madd_epi16(vec_g, mat1);
+        vec_b = _mm_madd_epi16(vec_b, mat2);
+
+        vec_r  = _mm_add_epi32(vec_r, _mm_add_epi32(vec_g, vec_b));
+        vec_r  = _mm_srli_epi32(vec_r, ONE_SHIFT);
+        vec_r  = _mm_max_epi32(min, vec_r);
+        result = _mm_min_epi32(max, vec_r);
+
+_mm_madd_epi16
+_mm_add_epi16
+_mm_max_epi16
+_mm_min_epi16
+_mm_srli_epi16
+
+(a1*b1+a2*b2), (a3*b3*+a4*b4)
+(a1*b1+a2*b2), (a3*b3*+a4*b4)
+
+*/
+
+#define ONE_SHIFT 14
+static const ALIGN float fixScaleX4[4] =
+    { 1<<ONE_SHIFT, 1<<ONE_SHIFT, 1<<ONE_SHIFT, 1<<ONE_SHIFT};
+
+void qcms_transform_data_rgb_out_lut_sse41_int(qcms_transform *transform,
+                                          unsigned char *src,
+                                          unsigned char *dest,
+                                          size_t length)
+{
+    unsigned int i;
+    float (*mat)[4] = transform->matrix;
+    char input_back[32];
+    /* Ensure we have a buffer that's 16 byte aligned regardless of the original
+     * stack alignment. We can't use __attribute__((aligned(16))) or __declspec(align(32))
+     * because they don't work on stack variables. gcc 4.4 does do the right thing
+     * on x86 but that's too new for us right now. For more info: gcc bug #16660 */
+    float const * input = (float*)(((uintptr_t)&input_back[16]) & ~0xf);
+    /* share input and output locations to save having to keep the
+     * locations in separate registers */
+    uint32_t const * output = (uint32_t*)input;
+
+    /* deref *transform now to avoid it in loop */
+    const float *igtbl_r = transform->input_gamma_table_r;
+    const float *igtbl_g = transform->input_gamma_table_g;
+    const float *igtbl_b = transform->input_gamma_table_b;
+
+    /* deref *transform now to avoid it in loop */
+    const uint8_t *otdata_r = &transform->output_table_r->data[0];
+    const uint8_t *otdata_g = &transform->output_table_g->data[0];
+    const uint8_t *otdata_b = &transform->output_table_b->data[0];
+
+    /* these values don't change, either */
+    const __m128i max   = _mm_set1_epi32(4096);
+    const __m128i min   = _mm_setzero_si128();
+    const __m128 scale = _mm_load_ps(floatScaleX4);
+    const __m128 fixscale = _mm_load_ps(fixScaleX4);
+
+    /* input matrix values never change */
+    const __m128i mat0  = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ps(mat[0]), fixscale));
+    const __m128i mat1  = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ps(mat[1]), fixscale));
+    const __m128i mat2  = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ps(mat[2]), fixscale));
+
+    /* working variables */
+    __m128i vec_r, vec_g, vec_b, result;
+
+    /* CYA */
+    if (!length)
+        return;
+
+    /* one pixel is handled outside of the loop */
+    length--;
+
+    /* setup for transforming 1st pixel */
+    vec_r = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ss(&igtbl_r[src[0]]), fixscale));
+    vec_g = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ss(&igtbl_g[src[1]]), fixscale));
+    vec_b = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ss(&igtbl_b[src[2]]), fixscale));
+    src += 3;
+
+    /* transform all but final pixel */
+
+    for (i=0; i<length; i++)
+    {
+        /* position values from gamma tables */
+        vec_r = _mm_shuffle_ps(vec_r, vec_r, 0);
+        vec_g = _mm_shuffle_ps(vec_g, vec_g, 0);
+        vec_b = _mm_shuffle_ps(vec_b, vec_b, 0);
+
+        /* gamma * matrix */
+        vec_r = _mm_madd_epi16(vec_r, mat0);
+        vec_g = _mm_madd_epi16(vec_g, mat1);
+        vec_b = _mm_madd_epi16(vec_b, mat2);
+
+        vec_r  = _mm_add_epi32(vec_r, _mm_add_epi32(vec_g, vec_b));
+        vec_r  = _mm_srai_epi32(vec_r, ONE_SHIFT+(ONE_SHIFT-12));
+        vec_r  = _mm_max_epi32(min, vec_r);
+        result = _mm_min_epi32(max, vec_r);
+
+        /* store calc'd output tables indices */
+        _mm_store_si128((__m128i*)output, result);
+
+        /* load for next loop while store completes */
+	vec_r = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ss(&igtbl_r[src[0]]), fixscale));
+	vec_g = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ss(&igtbl_g[src[1]]), fixscale));
+	vec_b = _mm_cvtps_epi32(_mm_mul_ps(_mm_load_ss(&igtbl_b[src[2]]), fixscale));
+	src += 3;
+
+        /* use calc'd indices to output RGB values */
+        dest[0] = otdata_r[output[0]];
+        dest[1] = otdata_g[output[1]];
+        dest[2] = otdata_b[output[2]];
+        dest += 3;
+    }
+
+    /* handle final (maybe only) pixel */
+
+    vec_r = _mm_shuffle_ps(vec_r, vec_r, 0);
+    vec_g = _mm_shuffle_ps(vec_g, vec_g, 0);
+    vec_b = _mm_shuffle_ps(vec_b, vec_b, 0);
+
+    vec_r = _mm_madd_epi16(vec_r, mat0);
+    vec_g = _mm_madd_epi16(vec_g, mat1);
+    vec_b = _mm_madd_epi16(vec_b, mat2);
+
+    vec_r  = _mm_add_epi32(vec_r, _mm_add_epi32(vec_g, vec_b));
+    vec_r  = _mm_srli_epi32(vec_r, ONE_SHIFT);
+    vec_r  = _mm_max_epi32(min, vec_r);
+    result = _mm_min_epi32(max, vec_r);
+
+    _mm_store_si128((__m128i*)output, result);
+
+    dest[0] = otdata_r[output[0]];
+    dest[1] = otdata_g[output[1]];
+    dest[2] = otdata_b[output[2]];
+}
 

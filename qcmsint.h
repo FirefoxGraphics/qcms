@@ -34,7 +34,7 @@ struct precache_output
 	 * improve startup performance and reduce memory usage. ColorSync on
 	 * 10.5 uses 4097 which is perhaps because they use a fixed point
 	 * representation where 1. is represented by 0x1000. */
-#define PRECACHE_OUTPUT_SIZE 8192
+#define PRECACHE_OUTPUT_SIZE 4097
 #define PRECACHE_OUTPUT_MAX (PRECACHE_OUTPUT_SIZE-1)
 	uint8_t data[PRECACHE_OUTPUT_SIZE];
 };
@@ -276,6 +276,11 @@ static inline float uInt16Number_to_float(uInt16Number a)
 
 void precache_release(struct precache_output *p);
 qcms_bool set_rgb_colorants(qcms_profile *profile, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries);
+
+void qcms_transform_data_rgb_out_lut_sse41_int(qcms_transform *transform,
+                                          unsigned char *src,
+                                          unsigned char *dest,
+                                          size_t length);
 
 void qcms_transform_data_rgb_out_lut_sse2(qcms_transform *transform,
                                           unsigned char *src,
