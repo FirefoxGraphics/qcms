@@ -24,9 +24,10 @@
 
 #ifdef MOZ_QCMS
 
-#include "prtypes.h"
+#include "mozilla/StandardInteger.h"
 
-/* prtypes.h defines IS_LITTLE_ENDIAN and IS_BIG ENDIAN */
+#include "prtypes.h"
+/* prtypes.h defines IS_LITTLE_ENDIAN and IS_BIG_ENDIAN */
 
 #if defined (__SVR4) && defined (__sun)
 /* int_types.h gets included somehow, so avoid redefining the types differently */
@@ -34,20 +35,12 @@
 #elif defined (_AIX)
 #include <sys/types.h>
 #elif !defined(ANDROID) && !defined(__OpenBSD__)
-typedef PRInt8 int8_t;
-typedef PRUint8 uint8_t;
-typedef PRInt16 int16_t;
-typedef PRUint16 uint16_t;
-typedef PRInt32 int32_t;
-typedef PRUint32 uint32_t;
-typedef PRInt64 int64_t;
-typedef PRUint64 uint64_t;
 
 #ifdef __OS2__
 /* OS/2's stdlib typdefs uintptr_t. So we'll just include that so we don't collide */
 #include <stdlib.h>
 #elif !defined(__intptr_t_defined) && !defined(_UINTPTR_T_DEFINED)
-typedef PRUptrdiff uintptr_t;
+typedef unsigned long uintptr_t;
 #endif
 #endif
 
