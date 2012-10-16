@@ -1,8 +1,8 @@
 
 COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage
-#COVERAGE_FLAGS=
-OPT_FLAGS=-O0
+COVERAGE_FLAGS=
 OPT_FLAGS=
+OPT_FLAGS=-O2
 CFLAGS=`pkg-config --cflags lcms` -Wall $(OPT_FLAGS) $(COVERAGE_FLAGS) -Wdeclaration-after-statement -ggdb
 LDFLAGS=-ldl
 
