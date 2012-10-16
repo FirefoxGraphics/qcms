@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <string.h> //memcpy
 #include "qcmsint.h"
-#include "transform_util.h"
+#include "transform-util.h"
 #include "matrix.h"
 
 #if !defined(INFINITY)
