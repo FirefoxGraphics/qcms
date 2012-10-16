@@ -229,6 +229,17 @@ float u8Fixed8Number_to_float(uint16_t x)
 	return x/256.;
 }
 
+void convert_input_gamma_table(float *table)
+{
+	int x;
+	uint32_t *int_table = (uint32_t*)table;
+	for (x = 0; x<256; x++) {
+		int_table[x] = table[x]*(1<<14) + 0.5;
+
+	}
+}
+
+
 float *build_input_gamma_table(struct curveType *TRC)
 {
 	float *gamma_table;

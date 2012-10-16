@@ -1207,6 +1207,11 @@ qcms_transform* qcms_transform_create(
 		transform->input_gamma_table_r = build_input_gamma_table(in->redTRC);
 		transform->input_gamma_table_g = build_input_gamma_table(in->greenTRC);
 		transform->input_gamma_table_b = build_input_gamma_table(in->blueTRC);
+		
+		convert_input_gamma_table(transform->input_gamma_table_r);
+		convert_input_gamma_table(transform->input_gamma_table_g);
+		convert_input_gamma_table(transform->input_gamma_table_b);
+		
 		if (!transform->input_gamma_table_r || !transform->input_gamma_table_g || !transform->input_gamma_table_b) {
 			qcms_transform_release(transform);
 			return NO_MEM_TRANSFORM;
