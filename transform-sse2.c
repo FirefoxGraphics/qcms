@@ -324,6 +324,7 @@ void qcms_transform_data_rgb_out_lut_sse41_int(qcms_transform *transform,
     /* these values don't change, either */
     const __m128i max   = _mm_set1_epi16(4096);
     const __m128i min   = _mm_setzero_si128();
+    const __m128i half  = _mm_set1_epi32(1<<(ONE_SHIFT+(ONE_SHIFT-12)-1));
     const __m128 scale = _mm_load_ps(floatScaleX4);
     const __m128 fixscale = _mm_load_ps(fixScaleX4);
 
@@ -366,6 +367,7 @@ void qcms_transform_data_rgb_out_lut_sse41_int(qcms_transform *transform,
         vec_b = _mm_madd_epi16(vec_b, mat2);
 
         vec_r  = _mm_add_epi32(vec_b, vec_rg);
+	vec_r  = _mm_add_epi32(vec_r, half);
         vec_r  = _mm_srai_epi32(vec_r, ONE_SHIFT+(ONE_SHIFT-12));
 	// max and min require 4.1 we should avoid that we can use the 16 bit min and max
         vec_r  = _mm_max_epi16(min, vec_r);
@@ -398,6 +400,7 @@ void qcms_transform_data_rgb_out_lut_sse41_int(qcms_transform *transform,
     vec_b = _mm_madd_epi16(vec_b, mat2);
 
     vec_r  = _mm_add_epi32(vec_r, _mm_add_epi32(vec_g, vec_b));
+    vec_r  = _mm_add_epi32(vec_r, half);
     vec_r  = _mm_srai_epi32(vec_r, ONE_SHIFT+(ONE_SHIFT-12));
     vec_r  = _mm_max_epi16(min, vec_r);
     result = _mm_min_epi16(max, vec_r);

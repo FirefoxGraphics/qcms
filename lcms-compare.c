@@ -73,8 +73,12 @@ int main(int argc, char **argv)
 	printf("lcms: %ld\n", lcms_time);
 	printf("qcms: %ld\n", qcms_time);
 	int total_diff = 0;
+	int diff_sum = 0;
 	for (i=0; i<LENGTH; i++) {
 		int diff = 0;
+		diff_sum += (loutput[i*3]-qoutput[i*3]);
+		diff_sum += (loutput[i*3+1]-qoutput[i*3+1]);
+		diff_sum += (loutput[i*3+2]-qoutput[i*3+2]);
 		diff += abs(loutput[i*3]-qoutput[i*3]);
 		diff += abs(loutput[i*3+1]-qoutput[i*3+1]);
 		diff += abs(loutput[i*3+2]-qoutput[i*3+2]);
@@ -89,7 +93,7 @@ int main(int argc, char **argv)
 			//exit(1);
 		}
 	}
-	printf("%d - %f\n", total_diff, (double)total_diff/LENGTH);
+	printf("%d %d - %f\n", diff_sum, total_diff, (double)total_diff/LENGTH);
 	qcms_profile_release(input_profile);
 	qcms_profile_release(output_profile);
 	return 0;
