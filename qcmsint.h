@@ -281,6 +281,11 @@ void qcms_transform_data_rgb_out_lut_sse41_int(qcms_transform *transform,
                                           unsigned char *src,
                                           unsigned char *dest,
                                           size_t length);
+void qcms_transform_data_rgb_out_lut_mmx(qcms_transform *transform,
+                                          unsigned char *src,
+                                          unsigned char *dest,
+                                          size_t length);
+
 
 void qcms_transform_data_rgb_out_lut_sse2(qcms_transform *transform,
                                           unsigned char *src,

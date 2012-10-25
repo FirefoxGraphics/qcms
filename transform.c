@@ -988,7 +988,6 @@ static void cpuid(uint32_t fxn, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t 
 
 static int sse_version_available(void)
 {
-	return 0;
 #if defined(__x86_64__) || defined(__x86_64) || defined(_M_AMD64)
 	/* we know at build time that 64-bit CPUs always have SSE2
 	 * this tells the compiler that non-SSE2 branches will never be
@@ -1214,7 +1213,7 @@ qcms_transform* qcms_transform_create(
 #ifdef X86
 		    if (sse_version_available() >= 2) {
 			    if (in_type == QCMS_DATA_RGB_8)
-				    transform->transform_fn = qcms_transform_data_rgb_out_lut_sse41_int;
+				    transform->transform_fn = qcms_transform_data_rgb_out_lut_mmx;
 			    else
 				    transform->transform_fn = qcms_transform_data_rgba_out_lut_sse2;
 
