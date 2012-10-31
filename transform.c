@@ -348,7 +348,7 @@ static void qcms_transform_data_graya_out_precache(qcms_transform *transform, un
 	}
 }
 
-static void qcms_transform_data_rgb_out_lut_precache(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
+static void qcms_transform_data_rgb_out_lut_float(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
 {
 	unsigned int i;
 	float (*mat)[4] = transform->matrix;
@@ -378,6 +378,45 @@ static void qcms_transform_data_rgb_out_lut_precache(qcms_transform *transform, 
 		dest[OUTPUT_R_INDEX] = transform->output_table_r->data[r];
 		dest[OUTPUT_G_INDEX] = transform->output_table_g->data[g];
 		dest[OUTPUT_B_INDEX] = transform->output_table_b->data[b];
+		dest += RGB_OUTPUT_COMPONENTS;
+	}
+}
+#define ONE_SHIFT 14
+
+static void qcms_transform_data_rgb_out_lut_precache(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
+{
+	unsigned int i;
+	int (*mat)[4] = transform->matrix;
+	for (i = 0; i < length; i++) {
+		unsigned char device_r = *src++;
+		unsigned char device_g = *src++;
+		unsigned char device_b = *src++;
+		uint16_t r, g, b;
+
+		int linear_r = *(int*)&transform->input_gamma_table_r[device_r];
+		int linear_g = *(int*)&transform->input_gamma_table_g[device_g];
+		int linear_b = *(int*)&transform->input_gamma_table_b[device_b];
+
+		int out_linear_r = mat[0][0]*linear_r + mat[1][0]*linear_g + mat[2][0]*linear_b;
+		int out_linear_g = mat[0][1]*linear_r + mat[1][1]*linear_g + mat[2][1]*linear_b;
+		int out_linear_b = mat[0][2]*linear_r + mat[1][2]*linear_g + mat[2][2]*linear_b;
+
+		out_linear_r += 1<<(ONE_SHIFT+(ONE_SHIFT-12)-1);
+		out_linear_g += 1<<(ONE_SHIFT+(ONE_SHIFT-12)-1);
+		out_linear_b += 1<<(ONE_SHIFT+(ONE_SHIFT-12)-1);
+
+		out_linear_r >>= ONE_SHIFT+(ONE_SHIFT-12);
+		out_linear_g >>= ONE_SHIFT+(ONE_SHIFT-12);
+		out_linear_b >>= ONE_SHIFT+(ONE_SHIFT-12);
+
+		int max = 1<<12;
+		out_linear_r = out_linear_r > 4096 ? 4096 : (out_linear_r < 0 ? 0 : out_linear_r);
+		out_linear_g = out_linear_g > 4096 ? 4096 : (out_linear_g < 0 ? 0 : out_linear_g);
+		out_linear_b = out_linear_b > 4096 ? 4096 : (out_linear_b < 0 ? 0 : out_linear_b);
+
+		dest[OUTPUT_R_INDEX] = transform->output_table_r->data[out_linear_r];
+		dest[OUTPUT_G_INDEX] = transform->output_table_g->data[out_linear_g];
+		dest[OUTPUT_B_INDEX] = transform->output_table_b->data[out_linear_b];
 		dest += RGB_OUTPUT_COMPONENTS;
 	}
 }
@@ -949,6 +988,7 @@ static void cpuid(uint32_t fxn, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t 
 
 static int sse_version_available(void)
 {
+	return 0;
 #if defined(__x86_64__) || defined(__x86_64) || defined(_M_AMD64)
 	/* we know at build time that 64-bit CPUs always have SSE2
 	 * this tells the compiler that non-SSE2 branches will never be
@@ -1230,15 +1270,16 @@ qcms_transform* qcms_transform_create(
 
 		/* store the results in column major mode
 		 * this makes doing the multiplication with sse easier */
-		transform->matrix[0][0] = result.m[0][0];
-		transform->matrix[1][0] = result.m[0][1];
-		transform->matrix[2][0] = result.m[0][2];
-		transform->matrix[0][1] = result.m[1][0];
-		transform->matrix[1][1] = result.m[1][1];
-		transform->matrix[2][1] = result.m[1][2];
-		transform->matrix[0][2] = result.m[2][0];
-		transform->matrix[1][2] = result.m[2][1];
-		transform->matrix[2][2] = result.m[2][2];
+		int fixScale = 1<<ONE_SHIFT;
+		transform->matrix[0][0] = (int)(result.m[0][0]*fixScale + 0.5);
+		transform->matrix[1][0] = (int)(result.m[0][1]*fixScale + 0.5);
+		transform->matrix[2][0] = (int)(result.m[0][2]*fixScale + 0.5);
+		transform->matrix[0][1] = (int)(result.m[1][0]*fixScale + 0.5);
+		transform->matrix[1][1] = (int)(result.m[1][1]*fixScale + 0.5);
+		transform->matrix[2][1] = (int)(result.m[1][2]*fixScale + 0.5);
+		transform->matrix[0][2] = (int)(result.m[2][0]*fixScale + 0.5);
+		transform->matrix[1][2] = (int)(result.m[2][1]*fixScale + 0.5);
+		transform->matrix[2][2] = (int)(result.m[2][2]*fixScale + 0.5);
 
 	} else if (in->color_space == GRAY_SIGNATURE) {
 		if (in_type != QCMS_DATA_GRAY_8 &&

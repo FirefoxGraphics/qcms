@@ -235,7 +235,6 @@ void convert_input_gamma_table(float *table)
 	uint32_t *int_table = (uint32_t*)table;
 	for (x = 0; x<256; x++) {
 		int_table[x] = table[x]*(1<<14) + 0.5;
-
 	}
 }
 

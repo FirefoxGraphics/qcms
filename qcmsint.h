@@ -46,7 +46,7 @@ struct precache_output
 #endif
 
 struct _qcms_transform {
-	float ALIGN matrix[3][4];
+	int ALIGN matrix[3][4];
 	float *input_gamma_table_r;
 	float *input_gamma_table_g;
 	float *input_gamma_table_b;
