@@ -5,7 +5,6 @@ use libc::{fclose, fopen, fread, free, malloc, memset, FILE};
 use crate::{
     double_to_s15Fixed16Number,
     iccread::*,
-    matrix::Matrix,
     transform::get_rgb_colorants,
     transform::DataType,
     transform::{qcms_transform, transform_create},
@@ -103,22 +102,22 @@ unsafe extern "C" fn qcms_data_from_file(
     let length: u32;
     let remaining_length: u32;
     let read_length: usize;
-    let mut length_be: be32 = 0;
+    let mut length_be: u32 = 0;
     let data: *mut libc::c_void;
     *mem = std::ptr::null_mut::<libc::c_void>();
     *size = 0;
     if fread(
-        &mut length_be as *mut be32 as *mut libc::c_void,
+        &mut length_be as *mut u32 as *mut libc::c_void,
         1,
-        ::std::mem::size_of::<be32>(),
+        ::std::mem::size_of::<u32>(),
         file,
-    ) != ::std::mem::size_of::<be32>()
+    ) != ::std::mem::size_of::<u32>()
     {
         return;
     }
     length = u32::from_be(length_be);
     if length > MAX_PROFILE_SIZE as libc::c_uint
-        || (length as libc::c_ulong) < ::std::mem::size_of::<be32>() as libc::c_ulong
+        || (length as libc::c_ulong) < ::std::mem::size_of::<u32>() as libc::c_ulong
     {
         return;
     }
@@ -128,12 +127,12 @@ unsafe extern "C" fn qcms_data_from_file(
         return;
     }
     /* copy in length to the front so that the buffer will contain the entire profile */
-    *(data as *mut be32) = length_be;
+    *(data as *mut u32) = length_be;
     remaining_length =
-        (length as libc::c_ulong - ::std::mem::size_of::<be32>() as libc::c_ulong) as u32;
+        (length as libc::c_ulong - ::std::mem::size_of::<u32>() as libc::c_ulong) as u32;
     /* read the rest profile */
     read_length = fread(
-        (data as *mut libc::c_uchar).add(::std::mem::size_of::<be32>()) as *mut libc::c_void,
+        (data as *mut libc::c_uchar).add(::std::mem::size_of::<u32>()) as *mut libc::c_void,
         1,
         remaining_length as usize,
         file,
@@ -246,10 +245,7 @@ pub unsafe extern "C" fn qcms_data_create_rgb_with_gamma(
     let mut tag_table_offset: usize;
     let mut tag_data_offset: usize;
     let data: *mut libc::c_void;
-    let mut colorants: Matrix = Matrix {
-        m: [[0.; 3]; 3],
-        invalid: false,
-    };
+
     let TAG_XYZ: [u32; 3] = [TAG_rXYZ, TAG_gXYZ, TAG_bXYZ];
     let TAG_TRC: [u32; 3] = [TAG_rTRC, TAG_gTRC, TAG_bTRC];
     if mem.is_null() || size.is_null() {
@@ -273,7 +269,8 @@ pub unsafe extern "C" fn qcms_data_create_rgb_with_gamma(
     }
     memset(data, 0, length as usize);
     // Part1 : write rXYZ, gXYZ and bXYZ
-    if !get_rgb_colorants(&mut colorants, white_point, primaries) {
+    let colorants = get_rgb_colorants(white_point, primaries);
+    if colorants.invalid {
         free(data);
         return;
     }
