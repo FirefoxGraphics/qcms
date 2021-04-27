@@ -140,23 +140,11 @@ fn compute_curve_gamma_table_type2(table: &[u16]) -> Box<[f32; 256]> {
     gamma_table.into_boxed_slice().try_into().unwrap()
 }
 fn compute_curve_gamma_table_type_parametric(params: &[f32]) -> Box<[f32; 256]> {
-    let g: f32 = params[0];
-    let (a, b, c, d, e, f) = match &params[1..] {
-        [] => (1., 0., 0., -1., 0., 0.),
-        [a, b] => (*a, *b, 0., -b / a, 0., 0.),
-        [a, b, c] => (*a, *b, 0., -b / a, *c, *c),
-        [a, b, c, d] => (*a, *b, *c, *d, 0., 0.),
-        [a, b, c, d, e, f] => (*a, *b, *c, *d, *e, *f),
-        _ => panic!(),
-    };
+    let params = Param::new(params);
     let mut gamma_table = Vec::with_capacity(256);
     for i in 0..256 {
         let X = i as f32 / 255.;
-        gamma_table.push(clamp_float(if X >= d {
-            (a * X + b).powf(g) + e
-        } else {
-            c * X + f
-        }))
+        gamma_table.push(clamp_float(params.eval(X)));
     }
     gamma_table.into_boxed_slice().try_into().unwrap()
 }
@@ -199,6 +187,155 @@ pub fn build_colorant_matrix(p: &Profile) -> Matrix {
     result.invalid = false;
     result
 }
+
+/** Parametric representation of transfer function */
+#[derive(Debug)]
+struct Param {
+    g: f32,
+    a: f32,
+    b: f32,
+    c: f32,
+    d: f32,
+    e: f32,
+    f: f32,
+}
+
+impl Param {
+    fn new(params: &[f32]) -> Param {
+	// convert from the variable number of parameters
+	// contained in profiles to a unified representation.
+        let g: f32 = params[0];
+        match params[1..] {
+            [] => Param {
+                g,
+                a: 1.,
+                b: 0.,
+                c: 1.,
+                d: 0.,
+                e: 0.,
+                f: 0.,
+            },
+            [a, b] => Param {
+                g,
+                a,
+                b,
+                c: 0.,
+                d: -b / a,
+                e: 0.,
+                f: 0.,
+            },
+            [a, b, c] => Param {
+                g,
+                a,
+                b,
+                c: 0.,
+                d: -b / a,
+                e: c,
+                f: c,
+            },
+            [a, b, c, d] => Param {
+                g,
+                a,
+                b,
+                c,
+                d,
+                e: 0.,
+                f: 0.,
+            },
+            [a, b, c, d, e, f] => Param {
+                g,
+                a,
+                b,
+                c,
+                d,
+                e,
+                f,
+            },
+            _ => panic!(),
+        }
+    }
+
+    fn eval(&self, x: f32) -> f32 {
+        if x < self.d {
+            self.c * x + self.f
+        } else {
+            (self.a * x + self.b).powf(self.g) + self.e
+        }
+    }
+
+    fn invert(&self) -> Option<Param> {
+        // First check if the function is continuous at the cross-over point d.
+        let d1 = (self.a * self.d + self.b).powf(self.g) + self.e;
+        let d2 = self.c * self.d + self.f;
+
+        if (d1 - d2).abs() > 0.1 {
+            return None;
+        }
+        let d = d1;
+
+        // y = (a * x + b)^g + e
+        // y - e = (a * x + b)^g
+        // (y - e)^(1/g) = a*x + b
+        // (y - e)^(1/g) - b = a*x
+        // (y - e)^(1/g)/a - b/a = x
+        // ((y - e)/a^g)^(1/g) - b/a = x
+        // ((1/(a^g)) * y - e/(a^g))^(1/g) - b/a = x
+        let a = 1. / self.a.powf(self.g);
+        let b = -self.e / self.a.powf(self.g);
+        let g = 1. / self.g;
+        let e = -self.b / self.a;
+
+        // y = c * x + f
+        // y - f = c * x
+        // y/c - f/c = x
+        let (c, f);
+        if d <= 0. {
+            c = 1.;
+            f = 0.;
+        } else {
+            c = 1. / self.c;
+            f = -self.f / self.c;
+        }
+
+        // if self.d > 0. and self.c == 0 as is likely with type 1 and 2 parametric function
+        // then c and f will not be finite.
+        if !(g.is_finite()
+            && a.is_finite()
+            && b.is_finite()
+            && c.is_finite()
+            && d.is_finite()
+            && e.is_finite()
+            && f.is_finite())
+        {
+            return None;
+        }
+
+        Some(Param {
+            g,
+            a,
+            b,
+            c,
+            d,
+            e,
+            f,
+        })
+    }
+}
+
+#[test]
+fn param_invert() {
+    let p3 = Param::new(&[2.4, 0.948, 0.052, 0.077, 0.04]);
+    p3.invert().unwrap();
+    let g2_2 = Param::new(&[2.2]);
+    g2_2.invert().unwrap();
+    let g2_2 = Param::new(&[2.2, 0.9, 0.052]);
+    g2_2.invert().unwrap();
+    let g2_2 = dbg!(Param::new(&[2.2, 0.9, -0.52]));
+    g2_2.invert().unwrap();
+    let g2_2 = dbg!(Param::new(&[2.2, 0.9, -0.52, 0.1]));
+    assert!(g2_2.invert().is_none());
+}
+
 /* The following code is copied nearly directly from lcms.
  * I think it could be much better. For example, Argyll seems to have better code in
  * icmTable_lookup_bwd and icmTable_setup_bwd. However, for now this is a quick way
@@ -397,22 +534,25 @@ fn build_pow_table(gamma: f32, length: i32) -> Vec<u16> {
     output
 }
 
-pub(crate) fn build_output_lut(trc: &curveType) -> Vec<u16> {
+pub(crate) fn build_output_lut(trc: &curveType) -> Option<Vec<u16>> {
     match trc {
         curveType::Parametric(params) => {
+            let params = Param::new(params);
+            let inv_params = params.invert()?;
+
             let mut output = Vec::with_capacity(256);
-            let gamma_table = compute_curve_gamma_table_type_parametric(params);
             for i in 0..256 {
-                output.push((gamma_table[i as usize] * 65535f32) as u16);
+                let X = i as f32 / 255.;
+                output.push((inv_params.eval(X) * 65535.) as u16);
             }
-            output
+            Some(output)
         }
         curveType::Curve(data) => {
             match data.len() {
-                0 => build_linear_table(4096),
+                0 => Some(build_linear_table(4096)),
                 1 => {
                     let gamma = 1. / u8Fixed8Number_to_float(data[0]);
-                    build_pow_table(gamma, 4096)
+                    Some(build_pow_table(gamma, 4096))
                 }
                 _ => {
                     //XXX: the choice of a minimum of 256 here is not backed by any theory,
@@ -421,7 +561,7 @@ pub(crate) fn build_output_lut(trc: &curveType) -> Vec<u16> {
                     if output_gamma_lut_length < 256 {
                         output_gamma_lut_length = 256
                     }
-                    invert_lut(data, output_gamma_lut_length as i32)
+                    Some(invert_lut(data, output_gamma_lut_length as i32))
                 }
             }
         }
