@@ -8,8 +8,14 @@
 #![cfg_attr(feature = "neon", feature(stdsimd))]
 // These are needed for the neon intrinsics implementation
 // and can be removed once the MSRV is high enough (1.48)
-#![cfg_attr(feature = "neon", feature(platform_intrinsics, simd_ffi, link_llvm_intrinsics))]
-#![cfg_attr(feature = "neon", feature(aarch64_target_feature, arm_target_feature, raw_ref_op))]
+#![cfg_attr(
+    feature = "neon",
+    feature(platform_intrinsics, simd_ffi, link_llvm_intrinsics)
+)]
+#![cfg_attr(
+    feature = "neon",
+    feature(aarch64_target_feature, arm_target_feature, raw_ref_op)
+)]
 
 /// These values match the Rendering Intent values from the ICC spec
 #[repr(u32)]
@@ -58,6 +64,7 @@ mod transform;
 pub use iccread::qcms_CIE_xyY as CIE_xyY;
 pub use iccread::qcms_CIE_xyYTRIPLE as CIE_xyYTRIPLE;
 pub use iccread::Profile;
+// TODO: Add cicp/nclx types
 pub use transform::DataType;
 pub use transform::Transform;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
