@@ -171,9 +171,7 @@ pub(crate) fn build_input_gamma_table(TRC: Option<&curveType>) -> Option<Box<[f3
     })
 }
 pub fn build_colorant_matrix(p: &Profile) -> Matrix {
-    let mut result: Matrix = Matrix {
-        m: [[0.; 3]; 3],
-    };
+    let mut result: Matrix = Matrix { m: [[0.; 3]; 3] };
     result.m[0][0] = s15Fixed16Number_to_float(p.redColorant.X);
     result.m[0][1] = s15Fixed16Number_to_float(p.greenColorant.X);
     result.m[0][2] = s15Fixed16Number_to_float(p.blueColorant.X);
@@ -200,8 +198,8 @@ struct Param {
 
 impl Param {
     fn new(params: &[f32]) -> Param {
-	// convert from the variable number of parameters
-	// contained in profiles to a unified representation.
+        // convert from the variable number of parameters
+        // contained in profiles to a unified representation.
         let g: f32 = params[0];
         match params[1..] {
             [] => Param {
@@ -482,7 +480,7 @@ pub(crate) fn compute_precache(trc: &curveType, output: &mut [u8; PRECACHE_OUTPU
                 i += 1
             }
             //XXX: the choice of a minimum of 256 here is not backed by any theory,
-            //     measurement or data, howeve r it is what lcms uses.
+            //     measurement or data, however it is what lcms uses.
             //     the maximum number we would need is 65535 because that's the
             //     accuracy used for computing the pre cache table
             if inverted_size < 256 {
@@ -498,7 +496,7 @@ pub(crate) fn compute_precache(trc: &curveType, output: &mut [u8; PRECACHE_OUTPU
                 _ => {
                     let mut inverted_size = data.len() as i32;
                     //XXX: the choice of a minimum of 256 here is not backed by any theory,
-                    //     measurement or data, howeve r it is what lcms uses.
+                    //     measurement or data, however it is what lcms uses.
                     //     the maximum number we would need is 65535 because that's the
                     //     accuracy used for computing the pre cache table
                     if inverted_size < 256 {
