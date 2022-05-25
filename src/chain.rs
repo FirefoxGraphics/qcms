@@ -232,9 +232,9 @@ impl ModularTransform for Clut3x3 {
             let device_r: f32 = src[0];
             let device_g: f32 = src[1];
             let device_b: f32 = src[2];
-            let linear_r: f32 = lut_interp_linear_float(device_r, &input_clut_table_r);
-            let linear_g: f32 = lut_interp_linear_float(device_g, &input_clut_table_g);
-            let linear_b: f32 = lut_interp_linear_float(device_b, &input_clut_table_b);
+            let linear_r: f32 = lut_interp_linear_float(device_r, input_clut_table_r);
+            let linear_g: f32 = lut_interp_linear_float(device_g, input_clut_table_g);
+            let linear_b: f32 = lut_interp_linear_float(device_b, input_clut_table_b);
             let x: i32 = (linear_r * (self.grid_size as i32 - 1) as f32).floor() as i32;
             let y: i32 = (linear_g * (self.grid_size as i32 - 1) as f32).floor() as i32;
             let z: i32 = (linear_b * (self.grid_size as i32 - 1) as f32).floor() as i32;
@@ -269,11 +269,11 @@ impl ModularTransform for Clut3x3 {
             let b_y2: f32 = lerp(b_x3, b_x4, y_d);
             let clut_b: f32 = lerp(b_y1, b_y2, z_d);
             let pcs_r: f32 =
-                lut_interp_linear_float(clut_r, &self.output_clut_table[0].as_ref().unwrap());
+                lut_interp_linear_float(clut_r, self.output_clut_table[0].as_ref().unwrap());
             let pcs_g: f32 =
-                lut_interp_linear_float(clut_g, &self.output_clut_table[1].as_ref().unwrap());
+                lut_interp_linear_float(clut_g, self.output_clut_table[1].as_ref().unwrap());
             let pcs_b: f32 =
-                lut_interp_linear_float(clut_b, &self.output_clut_table[2].as_ref().unwrap());
+                lut_interp_linear_float(clut_b, self.output_clut_table[2].as_ref().unwrap());
             dest[0] = clamp_float(pcs_r);
             dest[1] = clamp_float(pcs_g);
             dest[2] = clamp_float(pcs_b);
@@ -307,10 +307,10 @@ impl ModularTransform for Clut4x3 {
         let input_clut_table_3 = self.input_clut_table[3].as_ref().unwrap();
         for (dest, src) in dest.chunks_exact_mut(3).zip(src.chunks_exact(4)) {
             debug_assert!(self.grid_size as i32 >= 1);
-            let linear_x: f32 = lut_interp_linear_float(src[0], &input_clut_table_0);
-            let linear_y: f32 = lut_interp_linear_float(src[1], &input_clut_table_1);
-            let linear_z: f32 = lut_interp_linear_float(src[2], &input_clut_table_2);
-            let linear_w: f32 = lut_interp_linear_float(src[3], &input_clut_table_3);
+            let linear_x: f32 = lut_interp_linear_float(src[0], input_clut_table_0);
+            let linear_y: f32 = lut_interp_linear_float(src[1], input_clut_table_1);
+            let linear_z: f32 = lut_interp_linear_float(src[2], input_clut_table_2);
+            let linear_w: f32 = lut_interp_linear_float(src[3], input_clut_table_3);
 
             let x: i32 = (linear_x * (self.grid_size as i32 - 1) as f32).floor() as i32;
             let y: i32 = (linear_y * (self.grid_size as i32 - 1) as f32).floor() as i32;
@@ -352,11 +352,11 @@ impl ModularTransform for Clut4x3 {
             let clut_b = quadlinear(b_tbl);
 
             let pcs_r =
-                lut_interp_linear_float(clut_r, &self.output_clut_table[0].as_ref().unwrap());
+                lut_interp_linear_float(clut_r, self.output_clut_table[0].as_ref().unwrap());
             let pcs_g =
-                lut_interp_linear_float(clut_g, &self.output_clut_table[1].as_ref().unwrap());
+                lut_interp_linear_float(clut_g, self.output_clut_table[1].as_ref().unwrap());
             let pcs_b =
-                lut_interp_linear_float(clut_b, &self.output_clut_table[2].as_ref().unwrap());
+                lut_interp_linear_float(clut_b, self.output_clut_table[2].as_ref().unwrap());
             dest[0] = clamp_float(pcs_r);
             dest[1] = clamp_float(pcs_g);
             dest[2] = clamp_float(pcs_b);
@@ -530,9 +530,9 @@ impl ModularTransform for GammaLut {
             let in_r: f32 = src[0];
             let in_g: f32 = src[1];
             let in_b: f32 = src[2];
-            out_r = lut_interp_linear(in_r as f64, &self.output_gamma_lut_r.as_ref().unwrap());
-            out_g = lut_interp_linear(in_g as f64, &self.output_gamma_lut_g.as_ref().unwrap());
-            out_b = lut_interp_linear(in_b as f64, &self.output_gamma_lut_b.as_ref().unwrap());
+            out_r = lut_interp_linear(in_r as f64, self.output_gamma_lut_r.as_ref().unwrap());
+            out_g = lut_interp_linear(in_g as f64, self.output_gamma_lut_g.as_ref().unwrap());
+            out_b = lut_interp_linear(in_b as f64, self.output_gamma_lut_b.as_ref().unwrap());
             dest[0] = clamp_float(out_r);
             dest[1] = clamp_float(out_g);
             dest[2] = clamp_float(out_b);
@@ -787,9 +787,9 @@ fn modular_transform_create_input(input: &Profile) -> Option<Vec<Box<dyn Modular
     if let Some(A2B0) = &input.A2B0 {
         let lut_transform;
         if A2B0.num_input_channels == 4 {
-            lut_transform = Some(modular_transform_create_lut4x3(&A2B0));
+            lut_transform = Some(modular_transform_create_lut4x3(A2B0));
         } else {
-            lut_transform = modular_transform_create_lut(&A2B0);
+            lut_transform = modular_transform_create_lut(A2B0);
         }
         if let Some(lut_transform) = lut_transform {
             transforms.extend(lut_transform);

@@ -53,12 +53,12 @@ use crate::{
     },
 };
 
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-#[cfg(all(target_arch = "arm", feature = "neon", std_arch))]
-use std::arch::is_arm_feature_detected;
 #[cfg(all(target_arch = "aarch64", feature = "neon", std_arch))]
 use std::arch::is_aarch64_feature_detected;
+#[cfg(all(target_arch = "arm", feature = "neon", std_arch))]
+use std::arch::is_arm_feature_detected;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 pub const PRECACHE_OUTPUT_SIZE: usize = 8192;
 pub const PRECACHE_OUTPUT_MAX: usize = PRECACHE_OUTPUT_SIZE - 1;
@@ -414,15 +414,15 @@ unsafe extern "C" fn qcms_transform_data_gray_template_lut<I: GrayFormat, F: For
 
         let out_device_r: f32 = lut_interp_linear(
             linear as f64,
-            &(*transform).output_gamma_lut_r.as_ref().unwrap(),
+            (*transform).output_gamma_lut_r.as_ref().unwrap(),
         );
         let out_device_g: f32 = lut_interp_linear(
             linear as f64,
-            &(*transform).output_gamma_lut_g.as_ref().unwrap(),
+            (*transform).output_gamma_lut_g.as_ref().unwrap(),
         );
         let out_device_b: f32 = lut_interp_linear(
             linear as f64,
-            &(*transform).output_gamma_lut_b.as_ref().unwrap(),
+            (*transform).output_gamma_lut_b.as_ref().unwrap(),
         );
         *dest.add(F::kRIndex) = clamp_u8(out_device_r * 255f32);
         *dest.add(F::kGIndex) = clamp_u8(out_device_g * 255f32);
@@ -1057,7 +1057,7 @@ unsafe fn qcms_transform_data_template_lut<F: Format>(
 
         let out_device_r: f32 = lut_interp_linear(
             out_linear_r as f64,
-            &(*transform).output_gamma_lut_r.as_ref().unwrap(),
+            (*transform).output_gamma_lut_r.as_ref().unwrap(),
         );
         let out_device_g: f32 = lut_interp_linear(
             out_linear_g as f64,

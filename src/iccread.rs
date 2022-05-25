@@ -489,7 +489,7 @@ fn read_tag_s15Fixed16ArrayType(src: &mut MemSource, tag: &Tag) -> Matrix {
 }
 fn read_tag_XYZType(src: &mut MemSource, index: &TagIndex, tag_id: u32) -> XYZNumber {
     let mut num = XYZNumber { X: 0, Y: 0, Z: 0 };
-    let tag = find_tag(&index, tag_id);
+    let tag = find_tag(index, tag_id);
     if let Some(tag) = tag {
         let offset: u32 = tag.offset;
         let type_0: u32 = read_u32(src, offset as usize);
