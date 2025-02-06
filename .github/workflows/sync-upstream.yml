@@ -2,8 +2,8 @@ name: Sync from mozilla-central
 
 on:
   schedule:
-    # Midnight on Sunday.
-    - cron: '0 0 * * 0'
+    # every day at 5:30 and 17:30 UTC
+    - cron: '30 5,17 * * *'
   workflow_dispatch:
 
 jobs:
